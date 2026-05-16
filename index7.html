@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinema Net Global - Real Call</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #151f32;
+            --bg-input: #1f293d;
+            --primary: #3b82f6;
+            --primary-hover: #1d4ed8;
+            --text: #ffffff;
+            --text-muted: #9ca3af;
+            --accent: #f59e0b;
+            --danger: #dc2626;
+            --private: #ec4899;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        h1 { font-size: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); margin: 10px 0; }
+        .container {
+            max-width: 550px;
+            width: 100%;
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        .container.fullscreen-video { max-width: 95% !important; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: none; box-sizing: border-box; font-size: 15px; }
+        input, select { background: var(--bg-input); color: var(--text); }
+        button { background: var(--primary); color: var(--text); cursor: pointer; font-weight: bold; }
+        button:hover { background: var(--primary-hover); }
+        .switch-link { text-align: center; font-size: 14px; cursor: pointer; color: var(--text-muted); text-decoration: underline; margin-top: 12px; }
+        
+        /* Video Player Area */
+        .video-wrapper { position: relative; width: 100%; padding-top: 56.25%; background: #000; border-radius: 8px; overflow: hidden; margin-bottom: 10px; transition: all 0.3s; }
+        .video-wrapper.tiktok-mode { padding-top: 177.77%; max-width: 320px; margin: 0 auto 10px auto; }
+        .video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+        
+        /* === KHU VỰC HIỂN THỊ CAMERA CALL THẬT === */
+        .video-call-streams {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .stream-box {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            padding-top: 75%; /* Tỷ lệ khung hình camera */
+            border: 1px solid #2d3d5a;
+        }
+        .stream-box video {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .stream-label {
+            position: absolute;
+            bottom: 5px; left: 5px;
+            background: rgba(0,0,0,0.6);
+            padding: 2px 6px;
+            font-size: 11px;
+            border-radius: 4px;
+            color: var(--accent);
+        }
+
+        /* Chat Box */
+        .chat-box { height: 220px; background: var(--bg-input); border-radius: 6px; padding: 10px; overflow-y: auto; margin-bottom: 10px; border: 1px solid #2d3d5a; }
+        .msg { margin: 6px 0; padding: 6px 10px; border-radius: 6px; background: #2d3d5a; word-break: break-word; font-size: 14px; }
+        .msg.private-msg { background: #3a1f30; border-left: 4px solid var(--private); }
+        .msg b { color: var(--accent); }
+        .msg .time { font-size: 11px; color: var(--text-muted); float: right; margin-top: 2px; }
+        .chat-img { max-width: 150px; border-radius: 6px; display: block; margin-top: 5px; border: 1px solid var(--primary); }
+        
+        .chat-tools { display: flex; gap: 5px; margin-bottom: 5px; }
+        .tool-btn { padding: 4px 8px; font-size: 13px; width: auto; margin: 0; background: #2d3d5a; }
+        .emote-box { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; background: var(--bg-input); padding: 8px; border-radius: 6px; margin-bottom: 5px; }
+        .emote-box span { font-size: 20px; text-align: center; cursor: pointer; }
+        
+        /* Call Controls */
+        .call-box { display: flex; justify-content: space-around; background: #111827; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .call-btn { width: auto; padding: 10px 15px; border-radius: 50%; background: #374151; font-size: 18px; }
+        .call-btn.active { background: #10b981; } /* Xanh lá khi bật */
+        .admin-panel { background: #2c1616; border: 1px solid #dc2626; }
+        .hidden { display: none !important; }
+        .flex-group { display: flex; gap: 8px; }
+    </style>
+</head>
+<body>
+
+    <h1>🎬 CINEMA NET GLOBAL</h1>
+
+    <div id="login-card" class="container">
+        <h3>ĐĂNG NHẬP</h3>
+        <input type="text" id="login-user" placeholder="Tên tài khoản">
+        <input type="password" id="login-pass" placeholder="Mật khẩu">
+        <button onclick="handleLogin()"><i class="fa-solid fa-right-to-bracket"></i> Vào phòng phim</button>
+        <div class="switch-link" onclick="toggleAuth(true)">Chưa có tài khoản? Đăng ký ngay</div>
+    </div>
+
+    <div id="register-card" class="container hidden">
+        <h3>ĐĂNG KÝ THÀNH VIÊN</h3>
+        <input type="text" id="reg-user" placeholder="Tạo tên tài khoản">
+        <input type="password" id="reg-pass" placeholder="Tạo mật khẩu">
+        <button onclick="handleRegister()"><i class="fa-solid fa-user-plus"></i> Hoàn tất đăng ký</button>
+        <div class="switch-link" onclick="toggleAuth(false)">Đã có tài khoản? Quay lại đăng nhập</div>
+    </div>
+
+    <div id="main-app" class="container hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div><i class="fa-solid fa-user"></i> <span id="display-name" style="color:var(--accent); font-weight:bold;"></span></div>
+            <select id="room-select" onchange="switchRoom()" style="width: 140px; margin: 0; padding: 6px;">
+                <option value="Phòng 1">🎬 Phòng Chiếu 1</option>
+                <option value="Phòng 2">🎬 Phòng Chiếu 2</option>
+                <option value="Phòng 3">🎬 Phòng Chiếu 3</option>
+            </select>
+        </div>
+
+        <div id="video-area" class="video-wrapper">
+            <iframe id="video-player" src="https://www.youtube.com/embed/dQw4w9WgXcQ" allowfullscreen></iframe>
+        </div>
+        
+        <div class="chat-tools">
+            <button class="tool-btn" onclick="resizeVideo('small')"><i class="fa-solid fa-minimize"></i> Thu nhỏ</button>
+            <button class="tool-btn" onclick="resizeVideo('large')"><i class="fa-solid fa-maximize"></i> Phóng to</button>
+            <button class="tool-btn" onclick="resizeVideo('tiktok')"><i class="fa-brands fa-tiktok"></i> Chế độ TikTok</button>
+        </div>
+
+        <div id="call-streams-area" class="video-call-streams hidden">
+            <div class="stream-box">
+                <video id="local-video" autoplay muted playsinline></video>
+                <div class="stream-label">Bạn (Local)</div>
+            </div>
+            <div class="stream-box">
+                <video id="remote-video" autoplay playsinline></video>
+                <div class="stream-label" id="remote-label">Bạn bè (Waiting...)</div>
+            </div>
+        </div>
+
+        <div class="call-box">
+            <button class="call-btn" id="btn-mic" onclick="toggleMic()"><i class="fa-solid fa-microphone-slash"></i></button>
+            <button class="call-btn" id="btn-cam" onclick="toggleCam()"><i class="fa-solid fa-video-slash"></i></button>
+            <button class="call-btn" id="btn-share" onclick="toggleScreenShare()"><i class="fa-solid fa-desktop"></i></button>
+            <button class="call-btn" onclick="endCallCall()" style="background:var(--danger); color: white;"><i class="fa-solid fa-phone-slash"></i></button>
+        </div>
+
+        <div class="chat-box" id="chat-content"></div>
+        
+        <div class="chat-tools">
+            <button class="tool-btn" onclick="toggleEmoteBox()"><i class="fa-regular fa-face-smile"></i> Thêm Emote</button>
+            <button class="tool-btn" onclick="sendImagePrompt()"><i class="fa-regular fa-image"></i> Gửi link ảnh</button>
+        </div>
+
+        <div id="emote-container" class="emote-box hidden">
+            <span onclick="insertEmote('😂')">😂</span><span onclick="insertEmote('🥰')">🥰</span>
+            <span onclick="insertEmote('😎')">😎</span><span onclick="insertEmote('🔥')">🔥</span>
+            <span onclick="insertEmote('👍')">👍</span><span onclick="insertEmote('😢')">😢</span>
+        </div>
+        
+        <div class="flex-group">
+            <input type="text" id="chat-msg" placeholder="Nhập tin nhắn..." onkeypress="if(event.key==='Enter') handleSendMessage()">
+            <button onclick="handleSendMessage()" style="width: 80px; margin: 8px 0;"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+
+        <button onclick="handleLogout()" style="background: var(--danger); margin-top: 15px; padding: 8px;"><i class="fa-solid fa-power-off"></i> Rời hệ thống</button>
+    </div>
+
+    <div id="admin-card" class="container admin-panel hidden">
+        <h3 style="color: #dc2626;"><i class="fa-solid fa-user-shield"></i> BẢNG QUẢN TRỊ ADMIN</h3>
+        <select id="admin-room">
+            <option value="Phòng 1">Phòng Chiếu 1</option>
+            <option value="Phòng 2">Phòng Chiếu 2</option>
+            <option value="Phòng 3">Phòng Chiếu 3</option>
+        </select>
+        <select id="video-type">
+            <option value="youtube">Phim YouTube (Embed link)</option>
+            <option value="tiktok">Phim Dọc TikTok (Embed link)</option>
+        </select>
+        <input type="text" id="admin-movie-url" placeholder="Dán mã nhúng URL phim">
+        <button onclick="updateMovie()" style="background: #dc2626;"><i class="fa-solid fa-film"></i> Đổi phim phòng chiếu tức thì</button>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://xycuajdatwcxmzneikvl.supabase.co"; 
+        const SUPABASE_KEY = "sb_publishable_KiW3TwdbdzfphJOiqV1dZQ_Ahv4-4Om"; 
+
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let currentUser = null;
+        let currentRoom = "Phòng 1";
+        
+        // Các biến điều khiển Call WebRTC Thật
+        let localStream = null;
+        let peerConnection = null;
+        let isCamOn = false;
+        let isMicOn = false;
+        let isSharingScreen = false;
+        let rtcChannel = null;
+
+        const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        function toggleAuth(isRegister) {
+            document.getElementById('login-card').classList.toggle('hidden', isRegister);
+            document.getElementById('register-card').classList.toggle('hidden', !isRegister);
+        }
+
+        function resizeVideo(size) {
+            const videoArea = document.getElementById('video-area');
+            const mainApp = document.getElementById('main-app');
+            videoArea.classList.remove('tiktok-mode');
+            mainApp.classList.remove('fullscreen-video');
+            if (size === 'large') mainApp.classList.add('fullscreen-video');
+            else if (size === 'tiktok') videoArea.classList.add('tiktok-mode');
+        }
+
+        function toggleEmoteBox() { document.getElementById('emote-container').classList.toggle('hidden'); }
+        function insertEmote(emote) { document.getElementById('chat-msg').value += emote; toggleEmoteBox(); }
+        function sendImagePrompt() {
+            const imgUrl = prompt("Nhập đường link hình ảnh (.jpg, .png, .gif):");
+            if (imgUrl) { document.getElementById('chat-msg').value = `[IMG]${imgUrl}[/IMG]`; handleSendMessage(); }
+        }
+
+        // ĐĂNG KÝ / ĐĂNG NHẬP
+        async function handleRegister() {
+            const user = document.getElementById('reg-user').value.trim();
+            const pass = document.getElementById('reg-pass').value.trim();
+            if(!user || !pass) return alert("Vui lòng điền đầy đủ!");
+            const { error } = await _supabase.from('users').insert([{ user: user, pass: pass, role: user === 'Kienpro888' ? 'admin' : 'user' }]);
+            if (error) alert('Lỗi: ' + error.message);
+            else { alert('Đăng ký tài khoản thành công!'); toggleAuth(false); }
+        }
+
+        async function handleLogin() {
+            const user = document.getElementById('login-user').value.trim();
+            const pass = document.getElementById('login-pass').value.trim();
+            const { data, error } = await _supabase.from('users').select('*').eq('user', user).eq('pass', pass);
+
+            if (error || !data || data.length === 0) {
+                alert('Tài khoản hoặc mật khẩu sai!');
+            } else {
+                currentUser = data[0].user;
+                document.getElementById('display-name').innerText = currentUser;
+                document.getElementById('login-card').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+
+                if(data[0].role === 'admin' || currentUser === 'Kienpro888') {
+                    document.getElementById('admin-card').classList.remove('hidden');
+                }
+
+                loadChatHistory();
+                loadCurrentMovie();
+                listenRealtimeUpdates();
+                initCallSignaling(); // Khởi tạo cổng truyền tín hiệu cuộc gọi
+            }
+        }
+
+        function switchRoom() {
+            currentRoom = document.getElementById('room-select').value;
+            endCallCall();
+            loadChatHistory();
+            loadCurrentMovie();
+        }
+
+        // TIN NHẮN CHAT 
+        async function handleSendMessage() {
+            const msgInput = document.getElementById('chat-msg');
+            const text = msgInput.value.trim();
+            if(!text) return;
+            let formattedText = `[${currentRoom}] ${text}`;
+            if (text.startsWith('@')) {
+                const parts = text.split(' ');
+                const targetUser = parts[0].substring(1);
+                formattedText = `[PRIVATE][${targetUser}][Từ: ${currentUser}] ${parts.slice(1).join(' ')}`;
+            }
+            await _supabase.from('chats').insert([{ user: currentUser, text: formattedText }]);
+            msgInput.value = '';
+        }
+
+        async function loadChatHistory() {
+            const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true });
+            if(data) {
+                const chatBox = document.getElementById('chat-content');
+                chatBox.innerHTML = '';
+                data.forEach(msg => {
+                    const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    if (msg.text.startsWith('[PRIVATE]')) {
+                        const match = msg.text.match(/^\[PRIVATE\]\[(.*?)\]\[Từ: (.*?)\] (.*)$/);
+                        if (match && (match[1] === currentUser || match[2] === currentUser)) {
+                            const div = document.createElement('div');
+                            div.className = 'msg private-msg';
+                            div.innerHTML = `<span class="time">${timeStr}</span><i class="fa-solid fa-lock" style="color:var(--private);"></i> <b>[Mật] ${match[2]}:</b> ${renderMediaContent(match[3])}`;
+                            chatBox.appendChild(div);
+                        }
+                    } else if (msg.text.startsWith(`[${currentRoom}]`)) {
+                        const content = msg.text.replace(`[${currentRoom}] `, '');
+                        const div = document.createElement('div');
+                        div.className = 'msg';
+                        div.innerHTML = `<span class="time">${timeStr}</span><b>${msg.user}:</b> ${renderMediaContent(content)}`;
+                        chatBox.appendChild(div);
+                    }
+                });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        function renderMediaContent(text) {
+            if (text.startsWith('[IMG]') && text.endsWith('[/IMG]')) {
+                return `<img src="${text.replace('[IMG]', '').replace('[/IMG]', '')}" class="chat-img" onerror="this.src='https://placehold.co/150?text=Loi+Anh'">`;
+            }
+            return text;
+        }
+
+        async function loadCurrentMovie() {
+            const { data } = await _supabase.from('movies').select('*').eq('title', currentRoom);
+            if(data && data.length > 0) {
+                document.getElementById('video-player').src = data[0].url;
+                if(data[0].url.includes('tiktok.com')) resizeVideo('tiktok');
+                else resizeVideo('small');
+            }
+        }
+
+        async function updateMovie() {
+            const room = document.getElementById('admin-room').value;
+            let url = document.getElementById('admin-movie-url').value.trim();
+            const type = document.getElementById('video-type').value;
+            if(!url) return alert("Vui lòng nhập link!");
+
+            if (type === 'youtube' && url.includes('watch?v=')) {
+                url = `https://www.youtube.com/embed/${url.split('v=')[1].split('&')[0]}`;
+            }
+            const { data } = await _supabase.from('movies').select('*').eq('title', room);
+            if(data && data.length > 0) await _supabase.from('movies').update({ url: url }).eq('title', room);
+            else await _supabase.from('movies').insert([{ title: room, url: url }]);
+            alert(`Đã đổi phim phòng thành công!`);
+            document.getElementById('admin-movie-url').value = '';
+            loadCurrentMovie();
+        }
+
+        // ==========================================================================
+        // 🛠️ HỆ THỐNG XỬ LÝ KẾT NỐI CUỘC GỌI VIDEO/AUDIO THẬT (WEBRTC)
+        // ==========================================================================
+        
+        function initCallSignaling() {
+            rtcChannel = _supabase.channel(`call-${currentRoom}`);
+            
+            rtcChannel
+                .on('broadcast', { event: 'signal' }, async ({ payload }) => {
+                    if (payload.sender === currentUser) return;
+
+                    if (payload.type === 'offer') {
+                        document.getElementById('call-streams-area').classList.remove('hidden');
+                        await ensureLocalStream({ video: true, audio: true });
+                        
+                        peerConnection = new RTCPeerConnection(iceServers);
+                        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                        
+                        peerConnection.ontrack = e => {
+                            document.getElementById('remote-video').srcObject = e.streams[0];
+                            document.getElementById('remote-label').innerText = payload.sender;
+                        };
+                        
+                        peerConnection.onicecandidate = e => {
+                            if (e.candidate) rtcChannel.send({ type: 'broadcast', event: 'signal', payload: { sender: currentUser, type: 'candidate', candidate: e.candidate } });
+                        };
+
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        
+                        rtcChannel.send({ type: 'broadcast', event: 'signal', payload: { sender: currentUser, type: 'answer', sdp: answer } });
+                    } 
+                    else if (payload.type === 'answer' && peerConnection) {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                    } 
+                    else if (payload.type === 'candidate' && peerConnection) {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(payload.candidate));
+                    }
+                    else if (payload.type === 'end') {
+                        closePeerConnection();
+                    }
+                })
+                .subscribe();
+        }
+
+        async function ensureLocalStream(constraints) {
+            if (!localStream) {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    document.getElementById('local-video').srcObject = localStream;
+                } catch (err) {
+                    console.error("Không mở được camera/mic:", err);
+                    alert("Vui lòng cho phép ứng dụng truy cập Camera và Microphone!");
+                }
+            }
+        }
+
+        async function startCallFlow() {
+            document.getElementById('call-streams-area').classList.remove('hidden');
+            await ensureLocalStream({ video: true, audio: true });
+
+            peerConnection = new RTCPeerConnection(iceServers);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = e => {
+                document.getElementById('remote-video').srcObject = e.streams[0];
+            };
+
+            peerConnection.onicecandidate = e => {
+                if (e.candidate) rtcChannel.send({ type: 'broadcast', event: 'signal', payload: { sender: currentUser, type: 'candidate', candidate: e.candidate } });
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            rtcChannel.send({ type: 'broadcast', event: 'signal', payload: { sender: currentUser, type: 'offer', sdp: offer } });
+        }
+
+        // Bật tắt Camera
+        async function toggleCam() {
+            isCamOn = !isCamOn;
+            const btn = document.getElementById('btn-cam');
+            if (isCamOn) {
+                await ensureLocalStream({ video: true, audio: true });
+                localStream.getVideoTracks()[0].enabled = true;
+                btn.innerHTML = `<i class="fa-solid fa-video"></i>`;
+                btn.classList.add('active');
+                if (!peerConnection) startCallFlow();
+            } else {
+                if (localStream && localStream.getVideoTracks()[0]) localStream.getVideoTracks()[0].enabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-video-slash"></i>`;
+                btn.classList.remove('active');
+            }
+        }
+
+        // Bật tắt Mic
+        async function toggleMic() {
+            isMicOn = !isMicOn;
+            const btn = document.getElementById('btn-mic');
+            if (isMicOn) {
+                await ensureLocalStream({ video: true, audio: true });
+                localStream.getAudioTracks()[0].enabled = true;
+                btn.innerHTML = `<i class="fa-solid fa-microphone"></i>`;
+                btn.classList.add('active');
+                if (!peerConnection) startCallFlow();
+            } else {
+                if (localStream && localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-microphone-slash"></i>`;
+                btn.classList.remove('active');
+            }
+        }
+
+        // Chia sẻ màn hình máy tính
+        async function toggleScreenShare() {
+            const btn = document.getElementById('btn-share');
+            if (!isSharingScreen) {
+                try {
+                    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                    const videoTrack = screenStream.getVideoTracks()[0];
+                    
+                    if (peerConnection) {
+                        const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+                        if (sender) sender.replaceTrack(videoTrack);
+                    }
+                    
+                    document.getElementById('local-video').srcObject = screenStream;
+                    btn.classList.add('active');
+                    isSharingScreen = true;
+
+                    videoTrack.onended = () => { stopScreenShare(); };
+                } catch (err) { console.error(err); }
+            } else {
+                stopScreenShare();
+            }
+        }
+
+        function stopScreenShare() {
+            const btn = document.getElementById('btn-share');
+            if (localStream) {
+                const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+                if (sender) sender.replaceTrack(localStream.getVideoTracks()[0]);
+                document.getElementById('local-video').srcObject = localStream;
+            }
+            btn.classList.remove('active');
+            isSharingScreen = false;
+        }
+
+        function closePeerConnection() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            document.getElementById('remote-video').srcObject = null;
+            document.getElementById('remote-label').innerText = "Bạn bè (Waiting...)";
+            document.getElementById('call-streams-area').classList.add('hidden');
+        }
+
+        function endCallCall() {
+            if (rtcChannel) rtcChannel.send({ type: 'broadcast', event: 'signal', payload: { sender: currentUser, type: 'end' } });
+            
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            closePeerConnection();
+
+            isCamOn = false; isMicOn = false; isSharingScreen = false;
+            document.getElementById('btn-cam').innerHTML = `<i class="fa-solid fa-video-slash"></i>`;
+            document.getElementById('btn-cam').classList.remove('active');
+            document.getElementById('btn-mic').innerHTML = `<i class="fa-solid fa-microphone-slash"></i>`;
+            document.getElementById('btn-mic').classList.remove('active');
+            document.getElementById('btn-share').classList.remove('active');
+        }
+
+        function listenRealtimeUpdates() {
+            _supabase
+                .channel('room-premium')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => { loadChatHistory(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'movies' }, () => { loadCurrentMovie(); })
+                .subscribe();
+        }
+
+        function handleLogout() {
+            endCallCall();
+            currentUser = null;
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('admin-card').classList.add('hidden');
+            document.getElementById('login-card').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
