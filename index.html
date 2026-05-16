@@ -17,7 +17,7 @@
 <body class="min-h-screen flex flex-col">
 
     <div id="auth-container" class="flex flex-col items-center justify-center flex-1 px-4 py-12">
-        <div class="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800 animate-fade-in">
+        <div class="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800">
             <h2 id="auth-title" class="text-3xl font-extrabold mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">Cinema Net</h2>
             <div class="space-y-4">
                 <div>
@@ -50,7 +50,7 @@
             
             <div class="xl:col-span-3 flex flex-col gap-6">
                 <div id="admin-controls" class="hidden bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
-                    <h3 class="text-xs font-bold uppercase tracking-widest text-teal-400 mb-3">🛡️ Hệ thống điều phối phòng chiếu (ADMIN)</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-teal-400 mb-3">🛡️ HỆ THỐNG ĐIỀU PHỐI PHÒNG CHIẾU (ADMIN)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <input type="text" id="movie-title" placeholder="Tên phim hoặc tiêu đề nhạc..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
                         <input type="text" id="movie-url" placeholder="Đường link YouTube / TikTok..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
@@ -58,8 +58,8 @@
                     </div>
 
                     <div class="mt-4 border-t border-slate-800/60 pt-3">
-                        <h4 class="text-xs font-semibold text-slate-400 mb-2">Kho lưu trữ video/nhạc đã thêm:</h4>
-                        <div id="admin-movie-list" class="max-h-28 overflow-y-auto space-y-1.5 text-xs text-slate-300">
+                        <h4 class="text-xs font-semibold text-slate-400 mb-2">Kho lưu trữ danh sách phim/nhạc đã thêm:</h4>
+                        <div id="admin-movie-list" class="max-h-32 overflow-y-auto space-y-1.5 text-xs text-slate-300">
                             </div>
                     </div>
                 </div>
@@ -67,9 +67,10 @@
                 <div class="flex-1 bg-slate-950 rounded-2xl overflow-hidden aspect-video relative border border-slate-800 shadow-2xl">
                     <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-slate-500">
                         <div class="text-4xl mb-2">🍿</div>
-                        <p class="text-base font-medium">Chờ Admin Kienpro888 phát video nhóm...</p>
+                        <p class="text-base font-medium">Chờ Admin phát video để xem nhóm...</p>
                     </div>
-                    <div id="player-container" class="w-full h-full hidden"></div>
+                    <div id="player-container" class="w-full h-full hidden">
+                        </div>
                 </div>
             </div>
 
@@ -79,7 +80,7 @@
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">📹 Phòng Gọi Truyền Hình</h3>
                         <div class="flex gap-1">
-                            <button onclick="triggerCallImageSend()" id="call-img-btn" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg text-[11px] font-medium transition">🖼️ Gửi ảnh call</button>
+                            <button onclick="triggerCallImageSend()" id="call-img-btn" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg text-[11px] font-medium transition">🖼️ Truyền ảnh call</button>
                             <button onclick="toggleVideoCall()" id="call-btn" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-3 py-1 rounded-lg text-[11px] transition">Bật Camera</button>
                         </div>
                     </div>
@@ -91,9 +92,9 @@
                         <div class="bg-slate-950 aspect-video rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
                             <video id="remote-video" autoplay playsinline class="w-full h-full object-cover hidden"></video>
                             <div id="remote-image-display" class="w-full h-full hidden bg-slate-900 flex items-center justify-center p-1">
-                                <img id="call-shared-img" class="max-w-full max-h-full object-contain rounded-lg shadow-md">
+                                <img id="call-shared-img" class="max-w-full max-h-full object-contain rounded-lg shadow-md" src="">
                             </div>
-                            <span id="remote-status" class="text-[10px] text-slate-600">Đang chờ đối phương...</span>
+                            <span id="remote-status" class="text-[10px] text-slate-600">Đang chờ kết nối...</span>
                             <span class="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-[9px] px-2 py-0.5 rounded-md text-slate-300">Bạn bè</span>
                         </div>
                     </div>
@@ -107,7 +108,7 @@
                 <div class="flex-1 flex flex-col overflow-hidden bg-slate-950/40">
                     <div id="private-selector-box" class="hidden p-2 bg-slate-900/60 border-b border-slate-800 flex gap-2 items-center text-xs">
                         <span class="text-slate-400 font-medium whitespace-nowrap">Gửi tới:</span>
-                        <input type="text" id="private-target" placeholder="Nhập tên tài khoản nhận..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-teal-500">
+                        <input type="text" id="private-target" placeholder="Nhập chính xác tên tài khoản nhận..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-teal-500">
                     </div>
 
                     <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3.5 text-sm"></div>
@@ -133,16 +134,19 @@
     </div>
 
     <script>
+        // Cấu hình URL dự án và mã Key kết nối Supabase của bạn
         const SUPABASE_URL = "https://xycuajdatwcxmzneikvl.supabase.co";
         const SUPABASE_KEY = "sb_publishable_KiW3TwdbdzfphJOiqV1dZQ_Ahv4-4Om"; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // Biến trạng thái hoạt động toàn cục
         let isLoginMode = true;
         let currentUser = null;
         let currentRole = 'user';
-        let currentChatTab = 'public'; // public hoặc private
+        let currentChatTab = 'public'; 
         let localStream = null;
 
+        // Tự động kiểm tra phiên đăng nhập cũ trong máy
         window.onload = function() {
             const savedUser = localStorage.getItem('cinema_user');
             const savedRole = localStorage.getItem('cinema_role');
@@ -157,22 +161,23 @@
             document.getElementById('auth-toggle-btn').innerText = isLoginMode ? 'Đăng ký ngay' : 'Đăng nhập tại đây';
         }
 
+        // Xử lý xác thực Đăng nhập / Đăng ký qua bảng dữ liệu 'users' tiếng Anh chuẩn
         async function handleAuth() {
             const userVal = document.getElementById('auth-username').value.trim();
             const passVal = document.getElementById('auth-password').value.trim();
-            if (!userVal || !passVal) { alert('Vui lòng điền đủ thông tin!'); return; }
+            if (!userVal || !passVal) { alert('Vui lòng điền đủ thông tin tài khoản và mật khẩu!'); return; }
 
             if (isLoginMode) {
                 const { data, error } = await _supabase.from('users').select('*').eq('user', userVal).eq('pass', passVal);
-                if (error) { alert('Lỗi: ' + error.message); } 
+                if (error) { alert('Hệ thống gặp lỗi: ' + error.message); } 
                 else if (data && data.length > 0) { loginSuccess(data[0]['user'], data[0]['role'] || 'user'); } 
-                else { alert('Sai thông tin tài khoản hoặc mật khẩu!'); }
+                else { alert('Tài khoản hoặc mật khẩu không chính xác!'); }
             } else {
-                // Tự động gán quyền admin cao cấp nếu tên đăng ký là Kienpro888
+                // Tự động trao toàn quyền Admin tối cao cho tài khoản mang tên Kienpro888
                 const roleVal = (userVal === 'Kienpro888') ? 'admin' : 'user';
                 const { error } = await _supabase.from('users').insert([{ "user": userVal, "pass": passVal, "role": roleVal }]);
-                if (error) { alert('Tên tài khoản trùng hoặc lỗi hệ thống!'); } 
-                else { alert('Đăng ký thành công! Hãy đăng nhập.'); toggleAuthMode(); }
+                if (error) { alert('Lỗi đăng ký: Tài khoản đã tồn tại hoặc cơ sở dữ liệu bị ngắt!'); } 
+                else { alert('Đăng ký tài khoản thành công! Hãy chuyển qua đăng nhập.'); toggleAuthMode(); }
             }
         }
 
@@ -186,11 +191,13 @@
             document.getElementById('main-container').classList.remove('hidden');
             document.getElementById('user-display').innerText = `👤 ${username} [${currentRole.toUpperCase()}]`;
 
+            // Mở tính năng quản trị nếu là Admin
             if (currentRole === 'admin') {
                 document.getElementById('admin-controls').classList.remove('hidden');
                 loadAdminMovieList();
             }
 
+            // Kích hoạt toàn bộ các kênh Realtime lắng nghe dữ liệu trực tuyến
             listenToMovieUpdates();
             listenToChatMessages();
             loadInitialChat();
@@ -225,7 +232,7 @@
             loadInitialChat();
         }
 
-        // ================= BIÊN TẬP QUẢN LÝ PHIM / NHẠC =================
+        // ================= ĐIỀU PHỐI VÀ QUẢN LÝ VIDEO PHÒNG CHIẾU =================
         async function updateMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             const url = document.getElementById('movie-url').value.trim();
@@ -234,7 +241,9 @@
             let type = 'youtube';
             if (url.includes('tiktok.com')) type = 'tiktok';
 
-            await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser }]);
+            const { error } = await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser }]);
+            if (error) { alert("Lỗi khi thêm phim: " + error.message); }
+            
             document.getElementById('movie-title').value = '';
             document.getElementById('movie-url').value = '';
             if(currentRole === 'admin') loadAdminMovieList();
@@ -248,14 +257,14 @@
                 data.forEach(m => {
                     listContainer.innerHTML += `<div class="flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800">
                         <span class="truncate pr-2">🎵 ${m.title} (${m.type})</span>
-                        <button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold">Xóa</button>
+                        <button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold px-2 py-0.5 rounded bg-rose-500/10 transition">Xóa</button>
                     </div>`;
                 });
             }
         }
 
         async function deleteMovie(id) {
-            if(confirm("Bạn có chắc chắn muốn xóa video này khỏi danh sách lưu trữ?")) {
+            if(confirm("Bạn có chắc chắn muốn xóa video này khỏi kho lưu trữ?")) {
                 await _supabase.from('movies').delete().eq('id', id);
                 loadAdminMovieList();
             }
@@ -268,6 +277,12 @@
             _supabase.channel('movie_channel_global')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movies' }, payload => {
                     renderPlayer(payload.new);
+                }).subscribe();
+            
+            // Lắng nghe thêm sự kiện xóa phim để cập nhật kho lưu trữ cho Admin
+            _supabase.channel('movie_delete_channel')
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'movies' }, () => {
+                    if(currentRole === 'admin') loadAdminMovieList();
                 }).subscribe();
         }
 
@@ -287,7 +302,7 @@
             }
         }
 
-        // ================= HỆ THỐNG TRÒ CHUYỆN (CHATS & CHATS_PRIVATE) =================
+        // ================= HỆ THỐNG TRÒ CHUYỆN (NHÓM CHUNG & RIÊNG TƯ) =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -296,10 +311,9 @@
                 const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(60);
                 if (data) data.forEach(msg => appendMessage(msg.user, msg.msg, msg.user === currentUser));
             } else {
-                // Tải tin nhắn riêng tư liên quan đến tài khoản này
                 const { data } = await _supabase.from('chats_private').select('*').or(`sender.eq.${currentUser},receiver.eq.${currentUser}`).order('created_at', { ascending: true });
                 if (data) data.forEach(msg => {
-                    const label = msg.sender === currentUser ? `Tới ${msg.receiver}` : `Từ ${msg.sender}`;
+                    const label = msg.sender === currentUser ? `To: ${msg.receiver}` : `From: ${msg.sender}`;
                     appendMessage(label, msg.msg, msg.sender === currentUser, msg.is_image);
                 });
             }
@@ -318,14 +332,16 @@
             _supabase.channel('private_chat_system')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
-                    if (currentChatTab === 'private' && (info.sender === currentUser || info.receiver === currentUser)) {
-                        // Nếu là tin nhắn hình ảnh gửi khi call
+                    if (info.sender === currentUser || info.receiver === currentUser) {
+                        // Kích hoạt luồng truyền ảnh hiển thị lên khung Call nếu có tín hiệu ảnh được gửi tới bạn
                         if (info.is_image && info.receiver === currentUser) {
                             showSharedImageOnCall(info.msg);
                         }
-                        const label = info.sender === currentUser ? `Tới ${info.receiver}` : `Từ ${info.sender}`;
-                        appendMessage(label, info.msg, info.sender === currentUser, info.is_image);
-                        document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+                        if (currentChatTab === 'private') {
+                            const label = info.sender === currentUser ? `To: ${info.receiver}` : `From: ${info.sender}`;
+                            appendMessage(label, info.msg, info.sender === currentUser, info.is_image);
+                            document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+                        }
                     }
                 }).subscribe();
         }
@@ -336,7 +352,7 @@
             msgEl.className = `p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 ml-auto font-medium shadow-md' : 'bg-slate-800 text-slate-100'}`;
             
             if (isImage) {
-                msgEl.innerHTML = `<p class="text-[9px] opacity-60 font-bold mb-1">${sender}</p><img src="${msg}" class="rounded-lg max-w-full h-auto border border-black/10" alt="Ảnh gửi">`;
+                msgEl.innerHTML = `<p class="text-[9px] opacity-60 font-bold mb-1">${sender}</p><img src="${msg}" class="rounded-lg max-w-full h-auto border border-black/10" alt="Ảnh truyền nhận">`;
             } else {
                 msgEl.innerHTML = `<p class="text-[9px] ${isMe ? 'text-slate-800' : 'text-slate-400'} font-bold">${sender}</p><p class="mt-0.5 break-words">${msg}</p>`;
             }
@@ -353,12 +369,12 @@
                 await _supabase.from('chats').insert([{ user: currentUser, msg: txt }]);
             } else {
                 const target = document.getElementById('private-target').value.trim();
-                if (!target) { alert('Vui lòng điền tên người nhận vào ô "Gửi tới"!'); return; }
+                if (!target) { alert('Mẹo: Điền chính xác tên tài khoản nhận vào ô "Gửi tới" trước khi nhắn tin mật nhé!'); return; }
                 await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: txt, is_image: false }]);
             }
         }
 
-        // ================= TÍNH NĂNG CALL TRUYỀN HÌNH ỔN ĐỊNH VÀ GỬI HÌNH ẢNH =================
+        // ================= HỆ THỐNG PHÒNG GỌI TRUYỀN HÌNH & TRUYỀN ẢNH =================
         async function toggleVideoCall() {
             const grid = document.getElementById('video-grid');
             const btn = document.getElementById('call-btn');
@@ -379,20 +395,20 @@
                     imgBtn.classList.remove('hidden');
                     btn.innerText = 'Tắt Camera';
                     btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1 rounded-lg text-[11px] transition";
-                } catch (err) { alert('Không kết nối được Camera vật lý: ' + err.message); }
+                } catch (err) { alert('Không kết nối được thiết bị Camera/Microphone: ' + err.message); }
             }
         }
 
         async function triggerCallImageSend() {
             const target = document.getElementById('private-target').value.trim();
             if (currentChatTab !== 'private' || !target) {
-                alert('Mẹo gửi hình ảnh khi Call: Bạn bấm qua Tab "Hộp thư riêng tư", điền tên tài khoản bạn bè vào ô "Gửi tới", rồi quay lại bấm nút này nhé!');
+                alert('Mẹo truyền hình ảnh cuộc gọi: Bạn bấm chọn Tab "Hộp thư riêng tư", điền tên tài khoản bạn bè vào ô "Gửi tới", rồi quay lại bấm nút này nhé!');
                 return;
             }
-            const imgUrl = prompt("Nhập đường link hình ảnh (URL chứa đuôi .jpg, .png...) bạn muốn truyền lên màn hình cuộc gọi:");
+            const imgUrl = prompt("Dán đường link hình ảnh (link chứa đuôi định dạng .jpg, .png, .gif...) bạn muốn hiển thị trực tiếp lên luồng cuộc gọi đối phương:");
             if (!imgUrl) return;
 
-            // Gửi tín hiệu hình ảnh thông qua bảng lưu trữ dữ liệu
+            // Đẩy tín hiệu ảnh qua cơ chế bảng dữ liệu Supabase
             await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: imgUrl, is_image: true }]);
         }
 
@@ -402,11 +418,11 @@
             const sharedImg = document.getElementById('call-shared-img');
             const statusText = document.getElementById('remote-status');
 
-            statusText.classList.add('hidden');
-            rVideo.classList.add('hidden');
+            if(statusText) statusText.classList.add('hidden');
+            if(rVideo) rVideo.classList.add('hidden');
             
             sharedImg.src = url;
-            rImgDisplay.classList.remove('hidden');
+            if(rImgDisplay) rImgDisplay.classList.remove('hidden');
         }
     </script>
 </body>
