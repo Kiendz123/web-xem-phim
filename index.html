@@ -59,10 +59,8 @@
                 <div class="flex-1 bg-slate-950 rounded-xl overflow-hidden aspect-video relative border border-slate-800 shadow-2xl">
                     <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-slate-500">
                         <p class="text-lg">Chưa có video nào được phát</p>
-                        <p class="text-sm">Admin vui lòng thêm link để bắt đầu xem phòng nhóm</p>
                     </div>
-                    <div id="player-container" class="w-full h-full hidden">
-                        </div>
+                    <div id="player-container" class="w-full h-full hidden"></div>
                 </div>
             </div>
 
@@ -86,8 +84,7 @@
                 </div>
 
                 <div class="flex-1 flex flex-col overflow-hidden">
-                    <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 text-sm">
-                        </div>
+                    <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 text-sm"></div>
                     <div class="p-3 border-t border-slate-700 bg-slate-900/30 flex gap-2">
                         <input type="text" id="chat-input" onkeypress="if(event.key === 'Enter') sendChatMessage()" placeholder="Nhập tin nhắn..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
                         <button onclick="sendChatMessage()" class="bg-teal-500 hover:bg-teal-600 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm transition">Gửi</button>
@@ -98,28 +95,21 @@
     </div>
 
     <script>
-        // 1. Cấu hình thông tin kết nối Supabase của Kiên
         const SUPABASE_URL = "https://xycuajdatwcxmzneikvl.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_KiW3TwdbdzfphJOiqV1dZQ_Ahv4-4Om"; // Thay key chuẩn nếu cần
+        const SUPABASE_KEY = "sb_publishable_KiW3TwdbdzfphJOiqV1dZQ_Ahv4-4Om"; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Biến trạng thái toàn cục
         let isLoginMode = true;
         let currentUser = null;
         let currentRole = 'user';
         let localStream = null;
         let peerConnection = null;
-
-        // Cấu hình máy chủ WebRTC trung gian kết nối cuộc gọi miễn phí của Google
         const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-        // Kiểm tra xem đã đăng nhập sẵn trước đó chưa
         window.onload = function() {
             const savedUser = localStorage.getItem('cinema_user');
             const savedRole = localStorage.getItem('cinema_role');
-            if (savedUser) {
-                loginSuccess(savedUser, savedRole);
-            }
+            if (savedUser) { loginSuccess(savedUser, savedRole); }
         };
 
         function toggleAuthMode() {
@@ -130,7 +120,6 @@
             document.getElementById('auth-toggle-btn').innerText = isLoginMode ? 'Đăng ký ngay' : 'Đăng nhập tại đây';
         }
 
-        // Xử lý logic Đăng nhập / Đăng ký kết nối tiếng Việt với Supabase
         async function handleAuth() {
             const userVal = document.getElementById('auth-username').value.trim();
             const passVal = document.getElementById('auth-password').value.trim();
@@ -141,35 +130,31 @@
             }
 
             if (isLoginMode) {
-                // ĐĂNG NHẬP: Đọc từ bảng tiếng Việt 'người dùng' và cột 'người dùng'
+                // Đăng nhập kết nối với bảng tiếng Anh 'users'
                 const { data, error } = await _supabase
-                    .from('người dùng')
+                    .from('users')
                     .select('*')
-                    .eq('người dùng', userVal)
+                    .eq('user', userVal)
                     .eq('pass', passVal);
 
                 if (error) {
-                    alert('Lỗi đăng nhập hệ thống: ' + error.message);
+                    alert('Lỗi đăng nhập: ' + error.message);
                 } else if (data && data.length > 0) {
-                    loginSuccess(data[0]['người dùng'], data[0]['role'] || 'user');
+                    loginSuccess(data[0]['user'], data[0]['role'] || 'user');
                 } else {
-                    alert('Sai tài khoản hoặc mật khẩu rồi Kiên ơi, kiểm tra lại nhé!');
+                    alert('Sai tài khoản hoặc mật khẩu rồi bạn ơi!');
                 }
             } else {
-                // ĐĂNG KÝ: Chèn vào bảng tiếng Việt 'người dùng'
+                // Đăng ký kết nối với bảng tiếng Anh 'users'
                 const roleVal = (userVal === 'Kienpro888') ? 'admin' : 'user';
                 const { error } = await _supabase
-                    .from('người dùng')
-                    .insert([{ "người dùng": userVal, "pass": passVal, "role": roleVal }]);
+                    .from('users')
+                    .insert([{ "user": userVal, "pass": passVal, "role": roleVal }]);
 
                 if (error) {
-                    if (error.message.includes('duplicate')) {
-                        alert('Tên tài khoản này đã có người đăng ký rồi!');
-                    } else {
-                        alert('Lỗi đăng ký tài khoản: ' + error.message);
-                    }
+                    alert('Lỗi đăng ký: ' + error.message);
                 } else {
-                    alert('Đăng ký thành công mỹ mãn! Hãy tiến hành đăng nhập.');
+                    alert('Đăng ký thành công! Hãy tiến hành đăng nhập.');
                     toggleAuthMode();
                 }
             }
@@ -185,12 +170,10 @@
             document.getElementById('main-container').classList.remove('hidden');
             document.getElementById('user-display').innerText = `👋 Chào, ${username} (${role})`;
 
-            // Nếu đúng tài khoản admin Kienpro888 thì mở bảng điều khiển phim lên
             if (role === 'admin' || username === 'Kienpro888') {
                 document.getElementById('admin-controls').classList.remove('hidden');
             }
 
-            // Kích hoạt đồng bộ hóa thời gian thực (Realtime) dữ liệu Phim và Chat
             listenToMovieUpdates();
             listenToChatMessages();
             loadInitialChat();
@@ -202,42 +185,25 @@
             location.reload();
         }
 
-        // ================= XỬ LÝ PHIM (BẢNG MOVIES) =================
         async function updateMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             const url = document.getElementById('movie-url').value.trim();
+            if (!title || !url) return;
 
-            if (!title || !url) {
-                alert('Vui lòng điền đủ cả tên phim và đường dẫn link nhé!');
-                return;
-            }
-
-            // Xác định loại link
             let type = 'youtube';
             if (url.includes('tiktok.com')) type = 'tiktok';
 
-            // Lưu phim mới vào bảng dữ liệu 'movies' tiếng Anh chuẩn
-            const { error } = await _supabase
-                .from('movies')
-                .insert([{ title: title, url: url, type: type, added_by: currentUser }]);
-
-            if (error) {
-                alert('Không thêm được phim: ' + error.message);
-            } else {
-                document.getElementById('movie-title').value = '';
-                document.getElementById('movie-url').value = '';
-                alert('Đã cập nhật link phim mới lên phòng chiếu nhóm!');
-            }
+            await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser }]);
+            document.getElementById('movie-title').value = '';
+            document.getElementById('movie-url').value = '';
         }
 
         function listenToMovieUpdates() {
-            // Lấy phim đang chạy mới nhất hiện tại
             _supabase.from('movies').select('*').order('created_at', { ascending: false }).limit(1)
                 .then(({ data }) => { if(data && data.length > 0) renderPlayer(data[0]); });
 
-            // Lắng nghe xem khi nào admin chèn phim mới vào để tự đổi màn hình
             _supabase.channel('movie_channel')
-                .on('postgres_changes', { event: 'INSERT', scheme: 'public', table: 'movies' }, payload => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movies' }, payload => {
                     renderPlayer(payload.new);
                 }).subscribe();
         }
@@ -247,21 +213,17 @@
             const container = document.getElementById('player-container');
             container.classList.remove('hidden');
 
-            let embedUrl = '';
             if (movie.type === 'youtube') {
                 let videoId = '';
                 if(movie.url.includes('v=')) videoId = movie.url.split('v=')[1].split('&')[0];
                 else if(movie.url.includes('youtu.be/')) videoId = movie.url.split('youtu.be/')[1].split('?')[0];
-                embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-                container.innerHTML = `<iframe src="${embedUrl}" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
             } else if (movie.type === 'tiktok') {
-                // Xử lý nhúng mã nháp cho TikTok Video
                 let videoId = movie.url.split('/video/')[1]?.split('?')[0] || '';
                 container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" class="w-full h-full" allowfullscreen></iframe>`;
             }
         }
 
-        // ================= XỬ LÝ NHẮN TIN CHAT (BẢNG CHATS) =================
         async function loadInitialChat() {
             const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(50);
             if (data) {
@@ -274,7 +236,7 @@
 
         function listenToChatMessages() {
             _supabase.channel('chat_channel')
-                .on('postgres_changes', { event: 'INSERT', scheme: 'public', table: 'chats' }, payload => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => {
                     appendMessage(payload.new);
                     const box = document.getElementById('chat-messages');
                     box.scrollTop = box.scrollHeight;
@@ -294,52 +256,28 @@
             const input = document.getElementById('chat-input');
             const txt = input.value.trim();
             if (!txt) return;
-
             input.value = '';
             await _supabase.from('chats').insert([{ user: currentUser, msg: txt }]);
         }
 
-        // ================= XỬ LÝ VIDEO CALL NHÓM (WEBRTC) =================
         async function toggleVideoCall() {
             const grid = document.getElementById('video-grid');
             const btn = document.getElementById('call-btn');
-
             if (localStream) {
-                // Nếu đang bật thì tắt camera đi
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
                 grid.classList.add('hidden');
                 btn.innerText = 'Bật Camera';
                 btn.className = "bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-3 py-1 rounded-lg text-xs transition";
             } else {
-                // Tiến hành kích hoạt xin quyền mở Camera + Micro điện thoại
                 try {
                     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                     document.getElementById('local-video').srcObject = localStream;
                     grid.classList.remove('hidden');
                     btn.innerText = 'Tắt Camera';
                     btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1 rounded-lg text-xs transition";
-                    
-                    // Khởi tạo tiến trình tạo kết nối cuộc gọi luồng
-                    initWebRTCCall();
-                } catch (err) {
-                    alert('Điện thoại chưa cấp quyền mở camera hoặc không hỗ trợ: ' + err.message);
-                }
+                } catch (err) { alert('Không mở được camera: ' + err.message); }
             }
-        }
-
-        function initWebRTCCall() {
-            peerConnection = new RTCPeerConnection(rtcConfig);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-            peerConnection.ontrack = (event) => {
-                const rVideo = document.getElementById('remote-video');
-                rVideo.srcObject = event.streams[0];
-                rVideo.classList.remove('hidden');
-                document.getElementById('remote-status').classList.add('hidden');
-            };
-            
-            // Bạn có thể phát triển thêm hệ thống truyền tín hiệu Offer/Answer thông qua Supabase Realtime nếu muốn kết nối 2 điện thoại từ xa thật
         }
     </script>
 </body>
