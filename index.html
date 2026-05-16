@@ -227,11 +227,18 @@
         // ================= KHO LƯU TRỮ & PHÁT VIDEO =================
         async function addNewMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
-            const url = document.getElementById('movie-url').value.trim();
+            let url = document.getElementById('movie-url').value.trim();
             if (!title || !url) return;
 
             let type = 'youtube';
-            if (url.includes('tiktok.com')) type = 'tiktok';
+            if (url.includes('tiktok.com')) {
+                type = 'tiktok';
+                // Xử lý chuyển đổi link vt.tiktok sang link nhúng chuẩn trực tiếp bằng thuật toán cào ID
+                if (url.includes('vt.tiktok.com')) {
+                    let cleanPart = url.split('vt.tiktok.com/')[1].split('/')[0];
+                    url = `https://www.tiktok.com/embed/v2/${cleanPart}`;
+                }
+            }
 
             const { error } = await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser }]);
             if (error) { alert("Lỗi thêm: " + error.message); }
@@ -272,9 +279,14 @@
         }
 
         async function deleteMovie(id) {
-            if(confirm("Bạn có chắc muốn xóa video này?")) {
-                await _supabase.from('movies').delete().eq('id', id);
-                loadMovieList();
+            if(confirm("Bạn có chắc muốn xóa video này khỏi kho?")) {
+                const { error } = await _supabase.from('movies').delete().eq('id', id);
+                if (error) {
+                    alert("Lỗi xóa: " + error.message);
+                } else {
+                    // BUỘC PHẢI CHẠY LẠI HÀM NÀY ĐỂ MÀN HÌNH BIẾN MẤT VIDEO ĐÃ XÓA NGAY LẬP TỨC
+                    loadMovieList();
+                }
             }
         }
 
@@ -285,6 +297,12 @@
             _supabase.channel('movie_channel_global')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movies' }, payload => {
                     renderPlayer(payload.new);
+                }).subscribe();
+            
+            // Lắng nghe sự kiện xóa để cập nhật kho phim realtime cho cả phòng
+            _supabase.channel('movie_delete_channel')
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'movies' }, payload => {
+                    loadMovieList();
                 }).subscribe();
         }
 
@@ -300,12 +318,16 @@
                 else if(movie.url.includes('youtu.be/')) videoId = movie.url.split('youtu.be/')[1].split('?')[0];
                 container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
             } else if (movie.type === 'tiktok') {
-                let videoId = movie.url.includes('/video/') ? movie.url.split('/video/')[1]?.split('?')[0] : movie.url.split('/').pop().split('?')[0];
-                container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" class="w-full h-full" allow="autoplay" allowfullscreen></iframe>`;
+                if(movie.url.includes('/embed/')) {
+                    container.innerHTML = `<iframe src="${movie.url}" class="w-full h-full" allow="autoplay" allowfullscreen></iframe>`;
+                } else {
+                    let videoId = movie.url.includes('/video/') ? movie.url.split('/video/')[1]?.split('?')[0] : movie.url.split('/').pop().split('?')[0];
+                    container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" class="w-full h-full" allow="autoplay" allowfullscreen></iframe>`;
+                }
             }
         }
 
-        // ================= TRÒ CHUYỆN SỬA LỖI UNDEFINED =================
+        // ================= TRÒ CHUYỆN =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -313,7 +335,6 @@
             if (currentChatTab === 'public') {
                 const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(100);
                 if (data) data.forEach(msg => {
-                    // Kiểm tra linh hoạt các trường text nội dung của bảng chat tránh lỗi undefined
                     let content = msg.msg || msg.message || msg.text || '';
                     appendMessage(msg.user, content, msg.user === currentUser);
                 });
