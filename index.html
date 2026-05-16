@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #0b0f19; color: #f1f5f9; font-family: system-ui, sans-serif; }
-        iframe { background-color: #000; border-radius: 12px; }
+        iframe, video { background-color: #000; border-radius: 12px; width: 100%; height: 100%; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -50,12 +50,13 @@
             
             <div class="xl:col-span-3 flex flex-col gap-6">
                 <div id="admin-controls" class="hidden bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
-                    <h3 class="text-xs font-bold uppercase tracking-widest text-teal-400 mb-3">🛡️ HỆ THỐNG ĐIỀU PHỐI PHÒNG CHIẾU (ADMIN KIENPRO888)</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-teal-400 mb-3">🛡️ HỆ THỐNG ĐIỀU PHỐI PHÒNG CHIẾU (ADMIN)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                         <input type="text" id="movie-title" placeholder="Tên phim hoặc tiêu đề nhạc..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
-                        <input type="text" id="movie-url" placeholder="Đường link YouTube / TikTok..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
+                        <input type="text" id="movie-url" placeholder="Link YT / TikTok hoặc Link File (.mp4)..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
                         <button onclick="addNewMovieLink()" class="bg-teal-500 hover:bg-teal-600 text-slate-950 font-bold rounded-xl text-sm transition py-2.5">Thêm Vào Kho Lưu Trữ</button>
                     </div>
+                    <p class="text-[11px] text-slate-400 italic">*Mẹo: Hệ thống tự nhận biết link file video trực tiếp (.mp4, .m3u8, link get sẵn) để chạy trình phát mượt không quảng cáo.</p>
                 </div>
 
                 <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
@@ -224,19 +225,21 @@
             loadInitialChat();
         }
 
-        // ================= KHO LƯU TRỮ & PHÁT VIDEO =================
+        // ================= KHO LƯU TRỮ & ĐIỀU PHỐI VIDEO NÂNG CẤP =================
         async function addNewMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             let url = document.getElementById('movie-url').value.trim();
             if (!title || !url) return;
 
             let type = 'youtube';
-            if (url.includes('tiktok.com')) {
+            
+            // Bộ lọc nhận biết loại link thông minh
+            if (url.includes('.mp4') || url.includes('.m3u8') || url.includes('storage') || url.includes('cdn')) {
+                type = 'direct_file'; // Luồng file trực tiếp (Tốc độ cao)
+            } else if (url.includes('tiktok.com')) {
                 type = 'tiktok';
-                // Thuật toán bóc tách link nhúng tự động cho cả link vt.tiktok.com và link dạng thường công nghệ cao
                 if (url.includes('vt.tiktok.com')) {
                     let cleanPart = url.split('vt.tiktok.com/')[1].split('/')[0].split('?')[0];
-                    // Ép về cấu trúc nhúng chia sẻ trực tiếp không cần ID số (Khắc phục triệt để lỗi video không xem được)
                     url = `https://www.tiktok.com/player/v1/${cleanPart}?autoplay=1`;
                 }
             }
@@ -255,10 +258,13 @@
             if (data && listContainer) {
                 listContainer.innerHTML = '';
                 data.forEach(m => {
+                    let tagColor = 'bg-teal-500/10 text-teal-400';
+                    if (m.type === 'direct_file') tagColor = 'bg-amber-500/10 text-amber-400';
+                    
                     listContainer.innerHTML += `
                     <div class="flex justify-between items-center bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 hover:border-teal-500/50 transition">
                         <button onclick="playThisMovie(${m.id})" class="flex-1 text-left truncate font-semibold text-slate-200 hover:text-teal-400 transition">
-                            ▶️ ${m.title} <span class="text-[10px] opacity-40">(${m.type.toUpperCase()})</span>
+                            ▶️ ${m.title} <span class="text-[10px] px-1.5 py-0.5 rounded ${tagColor} ml-1">${m.type.toUpperCase()}</span>
                         </button>
                         ${currentRole === 'admin' ? `<button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold px-2 py-0.5 ml-2 bg-rose-500/10 rounded-lg transition">Xóa</button>` : ''}
                     </div>`;
@@ -282,11 +288,8 @@
         async function deleteMovie(id) {
             if(confirm("Bạn có chắc muốn xóa video này khỏi kho?")) {
                 const { error } = await _supabase.from('movies').delete().eq('id', id);
-                if (error) {
-                    alert("Lỗi xóa: " + error.message);
-                } else {
-                    loadMovieList();
-                }
+                if (error) alert("Lỗi xóa: " + error.message);
+                else loadMovieList();
             }
         }
 
@@ -299,7 +302,6 @@
                     renderPlayer(payload.new);
                 }).subscribe();
             
-            // ÉP REALTIME XÓA: Khi có bất kỳ ai xóa phim trên database, hệ thống ép cả phòng chạy lại loadMovieList()
             _supabase.channel('movie_delete_channel')
                 .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'movies' }, payload => {
                     loadMovieList();
@@ -312,23 +314,26 @@
             container.innerHTML = '';
             container.classList.remove('hidden');
 
-            if (movie.type === 'youtube') {
+            // TRÌNH PHÁT CHO TỪNG LOẠI LINK
+            if (movie.type === 'direct_file') {
+                // Sử dụng trình phát HTML5 cao cấp cho link file mp4 đã get trực tiếp
+                container.innerHTML = `<video src="${movie.url}" controls autoplay class="w-full h-full rounded-xl shadow-lg"></video>`;
+            } else if (movie.type === 'youtube') {
                 let videoId = '';
                 if(movie.url.includes('v=')) videoId = movie.url.split('v=')[1].split('&')[0];
                 else if(movie.url.includes('youtu.be/')) videoId = movie.url.split('youtu.be/')[1].split('?')[0];
-                container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
             } else if (movie.type === 'tiktok') {
-                // Hỗ trợ cấu trúc link nhúng trực tiếp từ trình phát nâng cấp player/v1
                 if(movie.url.includes('/player/v1/') || movie.url.includes('/embed/')) {
-                    container.innerHTML = `<iframe src="${movie.url}" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                    container.innerHTML = `<iframe src="${movie.url}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
                 } else {
                     let videoId = movie.url.includes('/video/') ? movie.url.split('/video/')[1]?.split('?')[0] : movie.url.split('/').pop().split('?')[0];
-                    container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" class="w-full h-full" allow="autoplay" allowfullscreen></iframe>`;
+                    container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" allow="autoplay" allowfullscreen></iframe>`;
                 }
             }
         }
 
-        // ================= TRÒ CHUYỆN =================
+        // ================= SỬA LỖI ĐỒNG BỘ CHAT (FIX UNDEFINED TRIỆT ĐỂ) =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -336,14 +341,16 @@
             if (currentChatTab === 'public') {
                 const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(100);
                 if (data) data.forEach(msg => {
-                    let content = msg.msg || msg.message || msg.text || '';
-                    appendMessage(msg.user, content, msg.user === currentUser);
+                    // Thuật toán quét tất cả các tên cột có thể có trong database của Kiên
+                    let content = msg.msg || msg.message || msg.text || msg.noidung || '';
+                    let sender = msg.user || msg.username || msg.sender || 'Ẩn danh';
+                    appendMessage(sender, content, sender === currentUser);
                 });
             } else {
                 const { data } = await _supabase.from('chats_private').select('*').or(`sender.eq.${currentUser},receiver.eq.${currentUser}`).order('created_at', { ascending: true });
                 if (data) data.forEach(msg => {
                     const label = msg.sender === currentUser ? `To: ${msg.receiver}` : `From: ${msg.sender}`;
-                    let content = msg.msg || msg.message || msg.text || '';
+                    let content = msg.msg || msg.message || msg.text || msg.noidung || '';
                     appendMessage(label, content, msg.sender === currentUser, msg.is_image);
                 });
             }
@@ -354,8 +361,10 @@
             _supabase.channel('public_chat_system')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => {
                     if (currentChatTab === 'public') {
-                        let content = payload.new.msg || payload.new.message || payload.new.text || '';
-                        appendMessage(payload.new.user, content, payload.new.user === currentUser);
+                        let info = payload.new;
+                        let content = info.msg || info.message || info.text || info.noidung || '';
+                        let sender = info.user || info.username || info.sender || 'Ẩn danh';
+                        appendMessage(sender, content, sender === currentUser);
                         document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                     }
                 }).subscribe();
@@ -364,7 +373,7 @@
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
                     if (info.sender === currentUser || info.receiver === currentUser) {
-                        let content = info.msg || info.message || info.text || '';
+                        let content = info.msg || info.message || info.text || info.noidung || '';
                         if (info.is_image && info.receiver === currentUser) {
                             showSharedImageOnCall(content);
                         }
@@ -378,6 +387,7 @@
         }
 
         function appendMessage(sender, msg, isMe, isImage = false) {
+            if(!msg) return; // Không hiển thị nếu tin nhắn trống rỗng
             const box = document.getElementById('chat-messages');
             const msgEl = document.createElement('div');
             msgEl.className = `p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 ml-auto font-medium shadow-md' : 'bg-slate-800 text-slate-100'}`;
@@ -397,11 +407,12 @@
             input.value = '';
 
             if (currentChatTab === 'public') {
-                await _supabase.from('chats').insert([{ user: currentUser, msg: txt }]);
+                // Tự động tối ưu đẩy dữ liệu vào đồng thời cả 2 cột phổ biến để triệt hạ hoàn toàn lỗi hệ thống
+                await _supabase.from('chats').insert([{ user: currentUser, msg: txt, message: txt }]);
             } else {
                 const target = document.getElementById('private-target').value.trim();
                 if (!target) { alert('Hãy điền tên người nhận vào ô Gửi tới!'); return; }
-                await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: txt, is_image: false }]);
+                await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: txt, message: txt, is_image: false }]);
             }
         }
 
