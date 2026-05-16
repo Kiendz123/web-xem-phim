@@ -50,24 +50,24 @@
             
             <div class="xl:col-span-3 flex flex-col gap-6">
                 <div id="admin-controls" class="hidden bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
-                    <h3 class="text-xs font-bold uppercase tracking-widest text-teal-400 mb-3">🛡️ HỆ THỐNG QUẢN LÝ & BẤM CHỌN PHÁT VIDEO (ADMIN)</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-teal-400 mb-3">🛡️ HỆ THỐNG ĐIỀU PHỐI PHÒNG CHIẾU (ADMIN KIENPRO888)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                         <input type="text" id="movie-title" placeholder="Tên phim hoặc tiêu đề nhạc..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
                         <input type="text" id="movie-url" placeholder="Đường link YouTube / TikTok..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
                         <button onclick="addNewMovieLink()" class="bg-teal-500 hover:bg-teal-600 text-slate-950 font-bold rounded-xl text-sm transition py-2.5">Thêm Vào Kho Lưu Trữ</button>
                     </div>
+                </div>
 
-                    <div class="mt-4 border-t border-slate-800/60 pt-3">
-                        <h4 class="text-xs font-bold text-teal-300 mb-2 uppercase tracking-wide">👉 Bấm vào tên video dưới đây để phát lên màn hình nhóm:</h4>
-                        <div id="admin-movie-list" class="max-h-40 overflow-y-auto space-y-1.5 text-xs text-slate-300">
-                            </div>
-                    </div>
+                <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
+                    <h4 class="text-sm font-bold text-teal-300 mb-2 uppercase tracking-wide">🍿 KHO PHIM & NHẠC (Bấm vào tên để phát cho cả phòng):</h4>
+                    <div id="global-movie-list" class="max-h-44 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        </div>
                 </div>
 
                 <div class="flex-1 bg-slate-950 rounded-2xl overflow-hidden aspect-video relative border border-slate-800 shadow-2xl">
                     <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-slate-500">
                         <div class="text-4xl mb-2">🍿</div>
-                        <p class="text-base font-medium">Chờ Admin phát video hoặc nhạc nhóm...</p>
+                        <p class="text-base font-medium">Chờ Admin phát phim hoặc chọn một bài nhạc bên trên để xem nhóm...</p>
                     </div>
                     <div id="player-container" class="w-full h-full hidden"></div>
                 </div>
@@ -189,8 +189,7 @@
                 document.getElementById('admin-controls').classList.remove('hidden');
             }
 
-            // Tải kho danh sách video chung cho cả admin và thành viên lựa chọn
-            loadAdminMovieList();
+            loadMovieList();
             listenToMovieUpdates();
             listenToChatMessages();
             loadInitialChat();
@@ -225,7 +224,7 @@
             loadInitialChat();
         }
 
-        // ================= KHO LƯU TRỮ & ĐIỀU PHỐI PHÁT VIDEO =================
+        // ================= KHO LƯU TRỮ & PHÁT VIDEO =================
         async function addNewMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             const url = document.getElementById('movie-url').value.trim();
@@ -234,38 +233,35 @@
             let type = 'youtube';
             if (url.includes('tiktok.com')) type = 'tiktok';
 
-            const { error } = await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser, is_active: false }]);
+            const { error } = await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser }]);
             if (error) { alert("Lỗi thêm: " + error.message); }
             
             document.getElementById('movie-title').value = '';
             document.getElementById('movie-url').value = '';
-            loadAdminMovieList();
+            loadMovieList();
         }
 
-        async function loadAdminMovieList() {
+        async function loadMovieList() {
             const { data } = await _supabase.from('movies').select('*').order('created_at', { ascending: false });
-            const listContainer = document.getElementById('admin-movie-list');
+            const listContainer = document.getElementById('global-movie-list');
             if (data && listContainer) {
                 listContainer.innerHTML = '';
                 data.forEach(m => {
                     listContainer.innerHTML += `
-                    <div class="flex justify-between items-center bg-slate-950 p-2 rounded-xl border border-slate-800/80 hover:border-teal-500/50 transition">
-                        <button onclick="playThisMovie(${m.id})" class="flex-1 text-left truncate font-medium text-slate-200 hover:text-teal-400 transition">
-                            ▶️ ${m.title} <span class="text-[10px] opacity-50">(${m.type.toUpperCase()})</span>
+                    <div class="flex justify-between items-center bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 hover:border-teal-500/50 transition">
+                        <button onclick="playThisMovie(${m.id})" class="flex-1 text-left truncate font-semibold text-slate-200 hover:text-teal-400 transition">
+                            ▶️ ${m.title} <span class="text-[10px] opacity-40">(${m.type.toUpperCase()})</span>
                         </button>
-                        ${currentRole === 'admin' ? `<button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold px-2 py-0.5 ml-2 bg-rose-500/10 rounded transition">Xóa</button>` : ''}
+                        ${currentRole === 'admin' ? `<button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold px-2 py-0.5 ml-2 bg-rose-500/10 rounded-lg transition">Xóa</button>` : ''}
                     </div>`;
                 });
             }
         }
 
-        // Hàm kích hoạt phát video được chọn lên phòng chiếu chung
         async function playThisMovie(id) {
-            // Bước 1: Lấy thông tin video được chọn
             const { data } = await _supabase.from('movies').select('*').eq('id', id);
             if(data && data.length > 0) {
                 const targetMovie = data[0];
-                // Bước 2: Gửi đè một dòng bản ghi mới nhất lên postgres để kích hoạt realtime phát video cho cả phòng
                 await _supabase.from('movies').insert([{ 
                     title: targetMovie.title, 
                     url: targetMovie.url, 
@@ -278,7 +274,7 @@
         async function deleteMovie(id) {
             if(confirm("Bạn có chắc muốn xóa video này?")) {
                 await _supabase.from('movies').delete().eq('id', id);
-                loadAdminMovieList();
+                loadMovieList();
             }
         }
 
@@ -295,6 +291,7 @@
         function renderPlayer(movie) {
             document.getElementById('video-placeholder').classList.add('hidden');
             const container = document.getElementById('player-container');
+            container.innerHTML = '';
             container.classList.remove('hidden');
 
             if (movie.type === 'youtube') {
@@ -303,30 +300,29 @@
                 else if(movie.url.includes('youtu.be/')) videoId = movie.url.split('youtu.be/')[1].split('?')[0];
                 container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
             } else if (movie.type === 'tiktok') {
-                // Tách ID video TikTok chuẩn xác cho cả link ngắn và link dài máy tính
-                let videoId = '';
-                if(movie.url.includes('/video/')) {
-                    videoId = movie.url.split('/video/')[1]?.split('?')[0] || '';
-                } else {
-                    videoId = movie.url.split('/').pop().split('?')[0];
-                }
+                let videoId = movie.url.includes('/video/') ? movie.url.split('/video/')[1]?.split('?')[0] : movie.url.split('/').pop().split('?')[0];
                 container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" class="w-full h-full" allow="autoplay" allowfullscreen></iframe>`;
             }
         }
 
-        // ================= TRÒ CHUYỆN (ĐỒNG BỘ TIN NHẮN) =================
+        // ================= TRÒ CHUYỆN SỬA LỖI UNDEFINED =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
             
             if (currentChatTab === 'public') {
                 const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(100);
-                if (data) data.forEach(msg => appendMessage(msg.user, msg.msg, msg.user === currentUser));
+                if (data) data.forEach(msg => {
+                    // Kiểm tra linh hoạt các trường text nội dung của bảng chat tránh lỗi undefined
+                    let content = msg.msg || msg.message || msg.text || '';
+                    appendMessage(msg.user, content, msg.user === currentUser);
+                });
             } else {
                 const { data } = await _supabase.from('chats_private').select('*').or(`sender.eq.${currentUser},receiver.eq.${currentUser}`).order('created_at', { ascending: true });
                 if (data) data.forEach(msg => {
                     const label = msg.sender === currentUser ? `To: ${msg.receiver}` : `From: ${msg.sender}`;
-                    appendMessage(label, msg.msg, msg.sender === currentUser, msg.is_image);
+                    let content = msg.msg || msg.message || msg.text || '';
+                    appendMessage(label, content, msg.sender === currentUser, msg.is_image);
                 });
             }
             box.scrollTop = box.scrollHeight;
@@ -336,7 +332,8 @@
             _supabase.channel('public_chat_system')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => {
                     if (currentChatTab === 'public') {
-                        appendMessage(payload.new.user, payload.new.msg, payload.new.user === currentUser);
+                        let content = payload.new.msg || payload.new.message || payload.new.text || '';
+                        appendMessage(payload.new.user, content, payload.new.user === currentUser);
                         document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                     }
                 }).subscribe();
@@ -345,12 +342,13 @@
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
                     if (info.sender === currentUser || info.receiver === currentUser) {
+                        let content = info.msg || info.message || info.text || '';
                         if (info.is_image && info.receiver === currentUser) {
-                            showSharedImageOnCall(info.msg);
+                            showSharedImageOnCall(content);
                         }
                         if (currentChatTab === 'private') {
                             const label = info.sender === currentUser ? `To: ${info.receiver}` : `From: ${info.sender}`;
-                            appendMessage(label, info.msg, info.sender === currentUser, info.is_image);
+                            appendMessage(label, content, info.sender === currentUser, info.is_image);
                             document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                         }
                     }
@@ -363,7 +361,7 @@
             msgEl.className = `p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 ml-auto font-medium shadow-md' : 'bg-slate-800 text-slate-100'}`;
             
             if (isImage) {
-                msgEl.innerHTML = `<p class="text-[9px] opacity-60 font-bold mb-1">${sender}</p><img src="${msg}" class="rounded-lg max-w-full h-auto" alt="Ảnh nhận">`;
+                msgEl.innerHTML = `<p class="text-[9px] opacity-60 font-bold mb-1">${sender}</p><img src="${msg}" class="rounded-lg max-w-full h-auto" alt="Ảnh">`;
             } else {
                 msgEl.innerHTML = `<p class="text-[9px] ${isMe ? 'text-slate-800' : 'text-slate-400'} font-bold">${sender}</p><p class="mt-0.5 break-words">${msg}</p>`;
             }
@@ -397,7 +395,6 @@
                 grid.classList.add('hidden');
                 imgBtn.classList.add('hidden');
                 btn.innerText = 'Bật Camera';
-                btn.className = "bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-3 py-1 rounded-lg text-[11px] transition";
             } else {
                 try {
                     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -405,7 +402,6 @@
                     grid.classList.remove('hidden');
                     imgBtn.classList.remove('hidden');
                     btn.innerText = 'Tắt Camera';
-                    btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1 rounded-lg text-[11px] transition";
                 } catch (err) { alert('Không mở được camera: ' + err.message); }
             }
         }
@@ -413,10 +409,10 @@
         async function triggerCallImageSend() {
             const target = document.getElementById('private-target').value.trim();
             if (currentChatTab !== 'private' || !target) {
-                alert('Vui lòng chọn tab Hộp thư riêng tư và điền tên người nhận vào ô Gửi tới trước!');
+                alert('Vui lòng chọn tab Hộp thư riêng tư và điền tên người nhận trước!');
                 return;
             }
-            const imgUrl = prompt("Nhập link ảnh đuôi .jpg, .png:");
+            const imgUrl = prompt("Nhập link ảnh:");
             if (!imgUrl) return;
             await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: imgUrl, is_image: true }]);
         }
