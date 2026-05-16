@@ -3,93 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinema Net - Xem Phim Nhóm & Video Call</title>
+    <title>Cinema Net Premium - Group Watch & Video Call</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0f172a; color: #f8fafc; }
-        iframe { background-color: #000; }
+        body { background-color: #0b0f19; color: #f1f5f9; font-family: system-ui, sans-serif; }
+        iframe { background-color: #000; border-radius: 12px; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col">
 
-    <div id="auth-container" class="flex flex-col items-center justify-center min-h-screen px-4">
-        <div class="bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-700">
-            <h2 id="auth-title" class="text-3xl font-bold mb-6 text-center text-teal-400">Đăng Nhập</h2>
-            
+    <div id="auth-container" class="flex flex-col items-center justify-center flex-1 px-4 py-12">
+        <div class="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800 animate-fade-in">
+            <h2 id="auth-title" class="text-3xl font-extrabold mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">Cinema Net</h2>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1">Tài khoản</label>
-                    <input type="text" id="auth-username" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Tài khoản</label>
+                    <input type="text" id="auth-username" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1">Mật khẩu</label>
-                    <input type="password" id="auth-password" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Mật khẩu</label>
+                    <input type="password" id="auth-password" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition">
                 </div>
-                <button onclick="handleAuth()" id="auth-btn" class="w-full bg-teal-500 hover:bg-teal-600 text-slate-900 font-bold py-2 rounded-lg transition mt-2">Đăng Nhập</button>
+                <button onclick="handleAuth()" id="auth-btn" class="w-full bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition duration-300 shadow-lg shadow-teal-500/20 mt-2">Đăng Nhập</button>
             </div>
-            
-            <p class="text-sm text-slate-400 mt-4 text-center">
+            <p class="text-sm text-slate-400 mt-6 text-center">
                 <span id="auth-toggle-text">Chưa có tài khoản?</span> 
-                <button onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-teal-400 hover:underline font-medium ml-1">Đăng ký ngay</button>
+                <button onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-teal-400 hover:underline font-semibold ml-1">Đăng ký ngay</button>
             </p>
         </div>
     </div>
 
-    <div id="main-container" class="hidden min-h-screen flex flex-col">
-        <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-teal-400">🎬 Cinema Net</h1>
+    <div id="main-container" class="hidden flex-1 flex flex-col">
+        <header class="bg-slate-900/50 backdrop-blur-md border-b border-slate-800/60 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+            <h1 class="text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">🎬 CINEMA NET</h1>
             <div class="flex items-center gap-4">
-                <span id="user-display" class="text-slate-300 font-medium"></span>
-                <button onclick="handleLogout()" class="bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white px-3 py-1 rounded-lg text-sm font-medium transition">Đăng xuất</button>
+                <span id="user-display" class="text-sm bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-slate-300 font-medium"></span>
+                <button onclick="handleLogout()" class="bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white px-4 py-1.5 rounded-xl text-sm font-semibold transition duration-200">Đăng xuất</button>
             </div>
         </header>
 
-        <main class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 p-4">
-            <div class="lg:col-span-3 flex flex-col gap-4">
-                <div id="admin-controls" class="hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
-                    <h3 class="text-sm font-semibold text-slate-400 mb-2">QUẢN TRỊ VIÊN: THÊM / ĐỔI LINK PHIM</h3>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="movie-title" placeholder="Tên phim/Video..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
-                        <input type="text" id="movie-url" placeholder="Link YouTube hoặc TikTok..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
-                        <button onclick="updateMovieLink()" class="bg-teal-500 hover:bg-teal-600 text-slate-900 font-bold px-6 py-2 rounded-lg text-sm transition">Cập nhật</button>
+        <main class="flex-1 grid grid-cols-1 xl:grid-cols-4 gap-6 p-6">
+            
+            <div class="xl:col-span-3 flex flex-col gap-6">
+                <div id="admin-controls" class="hidden bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-teal-400 mb-3">🛡️ Hệ thống điều phối phòng chiếu (ADMIN)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input type="text" id="movie-title" placeholder="Tên phim hoặc tiêu đề nhạc..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
+                        <input type="text" id="movie-url" placeholder="Đường link YouTube / TikTok..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
+                        <button onclick="updateMovieLink()" class="bg-teal-500 hover:bg-teal-600 text-slate-950 font-bold rounded-xl text-sm transition py-2.5">Cập Nhật Phòng Chiếu</button>
+                    </div>
+
+                    <div class="mt-4 border-t border-slate-800/60 pt-3">
+                        <h4 class="text-xs font-semibold text-slate-400 mb-2">Kho lưu trữ video/nhạc đã thêm:</h4>
+                        <div id="admin-movie-list" class="max-h-28 overflow-y-auto space-y-1.5 text-xs text-slate-300">
+                            </div>
                     </div>
                 </div>
 
-                <div class="flex-1 bg-slate-950 rounded-xl overflow-hidden aspect-video relative border border-slate-800 shadow-2xl">
-                    <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-slate-500">
-                        <p class="text-lg">Chưa có video nào được phát</p>
+                <div class="flex-1 bg-slate-950 rounded-2xl overflow-hidden aspect-video relative border border-slate-800 shadow-2xl">
+                    <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-slate-500">
+                        <div class="text-4xl mb-2">🍿</div>
+                        <p class="text-base font-medium">Chờ Admin Kienpro888 phát video nhóm...</p>
                     </div>
                     <div id="player-container" class="w-full h-full hidden"></div>
                 </div>
             </div>
 
-            <div class="bg-slate-800 rounded-xl border border-slate-700 flex flex-col h-[600px] lg:h-auto">
-                <div class="p-4 border-b border-slate-700 bg-slate-900/50 rounded-t-xl">
+            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl flex flex-col h-[650px] xl:h-auto overflow-hidden">
+                
+                <div class="p-4 border-b border-slate-800 bg-slate-900/80">
                     <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-bold text-teal-400 flex items-center gap-2">📹 Phòng Gọi Nhóm</h3>
-                        <button onclick="toggleVideoCall()" id="call-btn" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-3 py-1 rounded-lg text-xs transition">Bật Camera</button>
+                        <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">📹 Phòng Gọi Truyền Hình</h3>
+                        <div class="flex gap-1">
+                            <button onclick="triggerCallImageSend()" id="call-img-btn" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg text-[11px] font-medium transition">🖼️ Gửi ảnh call</button>
+                            <button onclick="toggleVideoCall()" id="call-btn" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-3 py-1 rounded-lg text-[11px] transition">Bật Camera</button>
+                        </div>
                     </div>
                     <div id="video-grid" class="grid grid-cols-2 gap-2 hidden">
-                        <div class="bg-slate-950 aspect-video rounded-lg overflow-hidden relative border border-slate-700">
+                        <div class="bg-slate-950 aspect-video rounded-xl overflow-hidden relative border border-slate-800">
                             <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-                            <span class="absolute bottom-1 left-1 bg-slate-900/80 text-[10px] px-1.5 py-0.5 rounded text-slate-300">Bạn</span>
+                            <span class="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-[9px] px-2 py-0.5 rounded-md text-slate-300">Bạn</span>
                         </div>
-                        <div class="bg-slate-950 aspect-video rounded-lg overflow-hidden relative border border-slate-700 flex items-center justify-center">
+                        <div class="bg-slate-950 aspect-video rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
                             <video id="remote-video" autoplay playsinline class="w-full h-full object-cover hidden"></video>
-                            <span id="remote-status" class="text-[10px] text-slate-500">Chờ kết nối...</span>
-                            <span class="absolute bottom-1 left-1 bg-slate-900/80 text-[10px] px-1.5 py-0.5 rounded text-slate-300">Bạn bè</span>
+                            <div id="remote-image-display" class="w-full h-full hidden bg-slate-900 flex items-center justify-center p-1">
+                                <img id="call-shared-img" class="max-w-full max-h-full object-contain rounded-lg shadow-md">
+                            </div>
+                            <span id="remote-status" class="text-[10px] text-slate-600">Đang chờ đối phương...</span>
+                            <span class="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-[9px] px-2 py-0.5 rounded-md text-slate-300">Bạn bè</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex-1 flex flex-col overflow-hidden">
-                    <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 text-sm"></div>
-                    <div class="p-3 border-t border-slate-700 bg-slate-900/30 flex gap-2">
-                        <input type="text" id="chat-input" onkeypress="if(event.key === 'Enter') sendChatMessage()" placeholder="Nhập tin nhắn..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
-                        <button onclick="sendChatMessage()" class="bg-teal-500 hover:bg-teal-600 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm transition">Gửi</button>
+                <div class="flex border-b border-slate-800/60 bg-slate-900/30 text-xs font-bold text-center">
+                    <button onclick="switchChatTab('public')" id="tab-public" class="flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/20">💬 Phòng Nhóm</button>
+                    <button onclick="switchChatTab('private')" id="tab-private" class="flex-1 py-3 text-slate-400 hover:text-slate-200 transition">🔒 Hộp Thư Riêng Tư</button>
+                </div>
+
+                <div class="flex-1 flex flex-col overflow-hidden bg-slate-950/40">
+                    <div id="private-selector-box" class="hidden p-2 bg-slate-900/60 border-b border-slate-800 flex gap-2 items-center text-xs">
+                        <span class="text-slate-400 font-medium whitespace-nowrap">Gửi tới:</span>
+                        <input type="text" id="private-target" placeholder="Nhập tên tài khoản nhận..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-teal-500">
+                    </div>
+
+                    <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3.5 text-sm"></div>
+
+                    <div id="emote-bar" class="px-3 py-1.5 bg-slate-900/40 border-t border-slate-800/40 flex gap-2 text-base overflow-x-auto">
+                        <button onclick="insertEmote('😊')" class="hover:scale-125 transition">😊</button>
+                        <button onclick="insertEmote('😂')" class="hover:scale-125 transition">😂</button>
+                        <button onclick="insertEmote('🥰')" class="hover:scale-125 transition">🥰</button>
+                        <button onclick="insertEmote('😎')" class="hover:scale-125 transition">😎</button>
+                        <button onclick="insertEmote('🔥')" class="hover:scale-125 transition">🔥</button>
+                        <button onclick="insertEmote('🎬')" class="hover:scale-125 transition">🎬</button>
+                        <button onclick="insertEmote('❤️')" class="hover:scale-125 transition">❤️</button>
+                    </div>
+
+                    <div class="p-3 border-t border-slate-800 bg-slate-900/60 flex gap-2">
+                        <input type="text" id="chat-input" onkeypress="if(event.key === 'Enter') sendChatMessage()" placeholder="Nhập nội dung nhắn tin..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-teal-500">
+                        <button onclick="sendChatMessage()" class="bg-teal-500 hover:bg-teal-600 text-slate-950 font-bold px-5 py-2 rounded-xl text-sm transition">Gửi</button>
                     </div>
                 </div>
+
             </div>
         </main>
     </div>
@@ -102,9 +140,8 @@
         let isLoginMode = true;
         let currentUser = null;
         let currentRole = 'user';
+        let currentChatTab = 'public'; // public hoặc private
         let localStream = null;
-        let peerConnection = null;
-        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         window.onload = function() {
             const savedUser = localStorage.getItem('cinema_user');
@@ -123,55 +160,35 @@
         async function handleAuth() {
             const userVal = document.getElementById('auth-username').value.trim();
             const passVal = document.getElementById('auth-password').value.trim();
-
-            if (!userVal || !passVal) {
-                alert('Vui lòng điền đầy đủ tài khoản và mật khẩu!');
-                return;
-            }
+            if (!userVal || !passVal) { alert('Vui lòng điền đủ thông tin!'); return; }
 
             if (isLoginMode) {
-                // Đăng nhập kết nối với bảng tiếng Anh 'users'
-                const { data, error } = await _supabase
-                    .from('users')
-                    .select('*')
-                    .eq('user', userVal)
-                    .eq('pass', passVal);
-
-                if (error) {
-                    alert('Lỗi đăng nhập: ' + error.message);
-                } else if (data && data.length > 0) {
-                    loginSuccess(data[0]['user'], data[0]['role'] || 'user');
-                } else {
-                    alert('Sai tài khoản hoặc mật khẩu rồi bạn ơi!');
-                }
+                const { data, error } = await _supabase.from('users').select('*').eq('user', userVal).eq('pass', passVal);
+                if (error) { alert('Lỗi: ' + error.message); } 
+                else if (data && data.length > 0) { loginSuccess(data[0]['user'], data[0]['role'] || 'user'); } 
+                else { alert('Sai thông tin tài khoản hoặc mật khẩu!'); }
             } else {
-                // Đăng ký kết nối với bảng tiếng Anh 'users'
+                // Tự động gán quyền admin cao cấp nếu tên đăng ký là Kienpro888
                 const roleVal = (userVal === 'Kienpro888') ? 'admin' : 'user';
-                const { error } = await _supabase
-                    .from('users')
-                    .insert([{ "user": userVal, "pass": passVal, "role": roleVal }]);
-
-                if (error) {
-                    alert('Lỗi đăng ký: ' + error.message);
-                } else {
-                    alert('Đăng ký thành công! Hãy tiến hành đăng nhập.');
-                    toggleAuthMode();
-                }
+                const { error } = await _supabase.from('users').insert([{ "user": userVal, "pass": passVal, "role": roleVal }]);
+                if (error) { alert('Tên tài khoản trùng hoặc lỗi hệ thống!'); } 
+                else { alert('Đăng ký thành công! Hãy đăng nhập.'); toggleAuthMode(); }
             }
         }
 
         function loginSuccess(username, role) {
             currentUser = username;
-            currentRole = role;
+            currentRole = (username === 'Kienpro888') ? 'admin' : role;
             localStorage.setItem('cinema_user', username);
-            localStorage.setItem('cinema_role', role);
+            localStorage.setItem('cinema_role', currentRole);
 
             document.getElementById('auth-container').classList.add('hidden');
             document.getElementById('main-container').classList.remove('hidden');
-            document.getElementById('user-display').innerText = `👋 Chào, ${username} (${role})`;
+            document.getElementById('user-display').innerText = `👤 ${username} [${currentRole.toUpperCase()}]`;
 
-            if (role === 'admin' || username === 'Kienpro888') {
+            if (currentRole === 'admin') {
                 document.getElementById('admin-controls').classList.remove('hidden');
+                loadAdminMovieList();
             }
 
             listenToMovieUpdates();
@@ -180,11 +197,35 @@
         }
 
         function handleLogout() {
-            localStorage.removeItem('cinema_user');
-            localStorage.removeItem('cinema_role');
+            localStorage.clear();
             location.reload();
         }
 
+        function insertEmote(emote) {
+            const input = document.getElementById('chat-input');
+            input.value += emote;
+            input.focus();
+        }
+
+        function switchChatTab(tab) {
+            currentChatTab = tab;
+            const tPub = document.getElementById('tab-public');
+            const tPriv = document.getElementById('tab-private');
+            const selector = document.getElementById('private-selector-box');
+
+            if (tab === 'public') {
+                tPub.className = "flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/20";
+                tPriv.className = "flex-1 py-3 text-slate-400 hover:text-slate-200 transition";
+                selector.classList.add('hidden');
+            } else {
+                tPriv.className = "flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/20";
+                tPub.className = "flex-1 py-3 text-slate-400 hover:text-slate-200 transition";
+                selector.classList.remove('hidden');
+            }
+            loadInitialChat();
+        }
+
+        // ================= BIÊN TẬP QUẢN LÝ PHIM / NHẠC =================
         async function updateMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             const url = document.getElementById('movie-url').value.trim();
@@ -196,13 +237,35 @@
             await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser }]);
             document.getElementById('movie-title').value = '';
             document.getElementById('movie-url').value = '';
+            if(currentRole === 'admin') loadAdminMovieList();
+        }
+
+        async function loadAdminMovieList() {
+            const { data } = await _supabase.from('movies').select('*').order('created_at', { ascending: false }).limit(20);
+            const listContainer = document.getElementById('admin-movie-list');
+            if (data && listContainer) {
+                listContainer.innerHTML = '';
+                data.forEach(m => {
+                    listContainer.innerHTML += `<div class="flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800">
+                        <span class="truncate pr-2">🎵 ${m.title} (${m.type})</span>
+                        <button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold">Xóa</button>
+                    </div>`;
+                });
+            }
+        }
+
+        async function deleteMovie(id) {
+            if(confirm("Bạn có chắc chắn muốn xóa video này khỏi danh sách lưu trữ?")) {
+                await _supabase.from('movies').delete().eq('id', id);
+                loadAdminMovieList();
+            }
         }
 
         function listenToMovieUpdates() {
             _supabase.from('movies').select('*').order('created_at', { ascending: false }).limit(1)
                 .then(({ data }) => { if(data && data.length > 0) renderPlayer(data[0]); });
 
-            _supabase.channel('movie_channel')
+            _supabase.channel('movie_channel_global')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movies' }, payload => {
                     renderPlayer(payload.new);
                 }).subscribe();
@@ -224,31 +287,59 @@
             }
         }
 
+        // ================= HỆ THỐNG TRÒ CHUYỆN (CHATS & CHATS_PRIVATE) =================
         async function loadInitialChat() {
-            const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(50);
-            if (data) {
-                const box = document.getElementById('chat-messages');
-                box.innerHTML = '';
-                data.forEach(msg => appendMessage(msg));
-                box.scrollTop = box.scrollHeight;
+            const box = document.getElementById('chat-messages');
+            box.innerHTML = '';
+            
+            if (currentChatTab === 'public') {
+                const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(60);
+                if (data) data.forEach(msg => appendMessage(msg.user, msg.msg, msg.user === currentUser));
+            } else {
+                // Tải tin nhắn riêng tư liên quan đến tài khoản này
+                const { data } = await _supabase.from('chats_private').select('*').or(`sender.eq.${currentUser},receiver.eq.${currentUser}`).order('created_at', { ascending: true });
+                if (data) data.forEach(msg => {
+                    const label = msg.sender === currentUser ? `Tới ${msg.receiver}` : `Từ ${msg.sender}`;
+                    appendMessage(label, msg.msg, msg.sender === currentUser, msg.is_image);
+                });
             }
+            box.scrollTop = box.scrollHeight;
         }
 
         function listenToChatMessages() {
-            _supabase.channel('chat_channel')
+            _supabase.channel('public_chat_system')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => {
-                    appendMessage(payload.new);
-                    const box = document.getElementById('chat-messages');
-                    box.scrollTop = box.scrollHeight;
+                    if (currentChatTab === 'public') {
+                        appendMessage(payload.new.user, payload.new.msg, payload.new.user === currentUser);
+                        document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+                    }
+                }).subscribe();
+
+            _supabase.channel('private_chat_system')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
+                    const info = payload.new;
+                    if (currentChatTab === 'private' && (info.sender === currentUser || info.receiver === currentUser)) {
+                        // Nếu là tin nhắn hình ảnh gửi khi call
+                        if (info.is_image && info.receiver === currentUser) {
+                            showSharedImageOnCall(info.msg);
+                        }
+                        const label = info.sender === currentUser ? `Tới ${info.receiver}` : `Từ ${info.sender}`;
+                        appendMessage(label, info.msg, info.sender === currentUser, info.is_image);
+                        document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+                    }
                 }).subscribe();
         }
 
-        function appendMessage(msg) {
+        function appendMessage(sender, msg, isMe, isImage = false) {
             const box = document.getElementById('chat-messages');
-            const isMe = msg.user === currentUser;
             const msgEl = document.createElement('div');
-            msgEl.className = `p-2 rounded-xl max-w-[85%] ${isMe ? 'bg-teal-500 text-slate-900 ml-auto' : 'bg-slate-700 text-white'}`;
-            msgEl.innerHTML = `<p class="text-[10px] opacity-60 font-bold">${msg.user}</p><p class="mt-0.5">${msg.msg}</p>`;
+            msgEl.className = `p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 ml-auto font-medium shadow-md' : 'bg-slate-800 text-slate-100'}`;
+            
+            if (isImage) {
+                msgEl.innerHTML = `<p class="text-[9px] opacity-60 font-bold mb-1">${sender}</p><img src="${msg}" class="rounded-lg max-w-full h-auto border border-black/10" alt="Ảnh gửi">`;
+            } else {
+                msgEl.innerHTML = `<p class="text-[9px] ${isMe ? 'text-slate-800' : 'text-slate-400'} font-bold">${sender}</p><p class="mt-0.5 break-words">${msg}</p>`;
+            }
             box.appendChild(msgEl);
         }
 
@@ -257,27 +348,65 @@
             const txt = input.value.trim();
             if (!txt) return;
             input.value = '';
-            await _supabase.from('chats').insert([{ user: currentUser, msg: txt }]);
+
+            if (currentChatTab === 'public') {
+                await _supabase.from('chats').insert([{ user: currentUser, msg: txt }]);
+            } else {
+                const target = document.getElementById('private-target').value.trim();
+                if (!target) { alert('Vui lòng điền tên người nhận vào ô "Gửi tới"!'); return; }
+                await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: txt, is_image: false }]);
+            }
         }
 
+        // ================= TÍNH NĂNG CALL TRUYỀN HÌNH ỔN ĐỊNH VÀ GỬI HÌNH ẢNH =================
         async function toggleVideoCall() {
             const grid = document.getElementById('video-grid');
             const btn = document.getElementById('call-btn');
+            const imgBtn = document.getElementById('call-img-btn');
+
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
                 grid.classList.add('hidden');
+                imgBtn.classList.add('hidden');
                 btn.innerText = 'Bật Camera';
-                btn.className = "bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-3 py-1 rounded-lg text-xs transition";
+                btn.className = "bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-3 py-1 rounded-lg text-[11px] transition";
             } else {
                 try {
                     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                     document.getElementById('local-video').srcObject = localStream;
                     grid.classList.remove('hidden');
+                    imgBtn.classList.remove('hidden');
                     btn.innerText = 'Tắt Camera';
-                    btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1 rounded-lg text-xs transition";
-                } catch (err) { alert('Không mở được camera: ' + err.message); }
+                    btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1 rounded-lg text-[11px] transition";
+                } catch (err) { alert('Không kết nối được Camera vật lý: ' + err.message); }
             }
+        }
+
+        async function triggerCallImageSend() {
+            const target = document.getElementById('private-target').value.trim();
+            if (currentChatTab !== 'private' || !target) {
+                alert('Mẹo gửi hình ảnh khi Call: Bạn bấm qua Tab "Hộp thư riêng tư", điền tên tài khoản bạn bè vào ô "Gửi tới", rồi quay lại bấm nút này nhé!');
+                return;
+            }
+            const imgUrl = prompt("Nhập đường link hình ảnh (URL chứa đuôi .jpg, .png...) bạn muốn truyền lên màn hình cuộc gọi:");
+            if (!imgUrl) return;
+
+            // Gửi tín hiệu hình ảnh thông qua bảng lưu trữ dữ liệu
+            await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: imgUrl, is_image: true }]);
+        }
+
+        function showSharedImageOnCall(url) {
+            const rVideo = document.getElementById('remote-video');
+            const rImgDisplay = document.getElementById('remote-image-display');
+            const sharedImg = document.getElementById('call-shared-img');
+            const statusText = document.getElementById('remote-status');
+
+            statusText.classList.add('hidden');
+            rVideo.classList.add('hidden');
+            
+            sharedImg.src = url;
+            rImgDisplay.classList.remove('hidden');
         }
     </script>
 </body>
