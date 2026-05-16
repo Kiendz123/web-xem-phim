@@ -233,10 +233,11 @@
             let type = 'youtube';
             if (url.includes('tiktok.com')) {
                 type = 'tiktok';
-                // Xử lý chuyển đổi link vt.tiktok sang link nhúng chuẩn trực tiếp bằng thuật toán cào ID
+                // Thuật toán bóc tách link nhúng tự động cho cả link vt.tiktok.com và link dạng thường công nghệ cao
                 if (url.includes('vt.tiktok.com')) {
-                    let cleanPart = url.split('vt.tiktok.com/')[1].split('/')[0];
-                    url = `https://www.tiktok.com/embed/v2/${cleanPart}`;
+                    let cleanPart = url.split('vt.tiktok.com/')[1].split('/')[0].split('?')[0];
+                    // Ép về cấu trúc nhúng chia sẻ trực tiếp không cần ID số (Khắc phục triệt để lỗi video không xem được)
+                    url = `https://www.tiktok.com/player/v1/${cleanPart}?autoplay=1`;
                 }
             }
 
@@ -284,7 +285,6 @@
                 if (error) {
                     alert("Lỗi xóa: " + error.message);
                 } else {
-                    // BUỘC PHẢI CHẠY LẠI HÀM NÀY ĐỂ MÀN HÌNH BIẾN MẤT VIDEO ĐÃ XÓA NGAY LẬP TỨC
                     loadMovieList();
                 }
             }
@@ -299,7 +299,7 @@
                     renderPlayer(payload.new);
                 }).subscribe();
             
-            // Lắng nghe sự kiện xóa để cập nhật kho phim realtime cho cả phòng
+            // ÉP REALTIME XÓA: Khi có bất kỳ ai xóa phim trên database, hệ thống ép cả phòng chạy lại loadMovieList()
             _supabase.channel('movie_delete_channel')
                 .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'movies' }, payload => {
                     loadMovieList();
@@ -318,8 +318,9 @@
                 else if(movie.url.includes('youtu.be/')) videoId = movie.url.split('youtu.be/')[1].split('?')[0];
                 container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
             } else if (movie.type === 'tiktok') {
-                if(movie.url.includes('/embed/')) {
-                    container.innerHTML = `<iframe src="${movie.url}" class="w-full h-full" allow="autoplay" allowfullscreen></iframe>`;
+                // Hỗ trợ cấu trúc link nhúng trực tiếp từ trình phát nâng cấp player/v1
+                if(movie.url.includes('/player/v1/') || movie.url.includes('/embed/')) {
+                    container.innerHTML = `<iframe src="${movie.url}" class="w-full h-full" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
                 } else {
                     let videoId = movie.url.includes('/video/') ? movie.url.split('/video/')[1]?.split('?')[0] : movie.url.split('/').pop().split('?')[0];
                     container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" class="w-full h-full" allow="autoplay" allowfullscreen></iframe>`;
