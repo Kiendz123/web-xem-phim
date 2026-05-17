@@ -528,12 +528,11 @@
                     if (answer.status === 'accepted') {
                         document.getElementById('remote-status').innerText = 'Đã kết nối!';
                         document.getElementById('remote-video').classList.remove('hidden');
-                        document.getElementById('hangup-btn').classList.remove('hidden'); // Hiện nút cúp máy khi thông cuộc gọi
+                        document.getElementById('hangup-btn').classList.remove('hidden'); 
                     } else if (answer.status === 'rejected') {
                         alert(`❌ Cuộc gọi bị từ chối bởi ${answer.sender}`);
                         resetCallInterface();
                     } else if (answer.status === 'hungup') {
-                        // Nhận tín hiệu cúp máy từ đầu dây bên kia
                         alert(`🔴 Cuộc gọi đã kết thúc bởi ${answer.sender}`);
                         resetCallInterface();
                     }
@@ -550,7 +549,7 @@
             document.getElementById('remote-status').innerText = 'Đang đổ chuông...';
             document.getElementById('video-grid').classList.remove('hidden');
             document.getElementById('call-img-btn').classList.remove('hidden');
-            document.getElementById('hangup-btn').classList.remove('hidden'); // Hiện nút hủy/cúp máy lập tức để bên gọi có thể hủy cuộc gọi khi đang đổ chuông
+            document.getElementById('hangup-btn').classList.remove('hidden'); 
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -575,7 +574,7 @@
             document.getElementById('remote-status').innerText = 'Đã kết nối!';
             document.getElementById('video-grid').classList.remove('hidden');
             document.getElementById('call-img-btn').classList.remove('hidden');
-            document.getElementById('hangup-btn').classList.remove('hidden'); // Hiện nút cúp máy cho bên nhận
+            document.getElementById('hangup-btn').classList.remove('hidden'); 
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -602,23 +601,19 @@
             });
         }
 
-        // HÀM CHỦ ĐỘNG BẤM NÚT CÚP MÁY KẾT THÚC CUỘC GỌI
         function endCurrentCall() {
             if (!currentActiveCallPartner) return;
             
-            // Phát đi tín hiệu kết thúc đến đối phương
             _supabase.channel('cinema_call_signal_room').send({
                 type: 'broadcast',
                 event: 'call_response',
                 payload: { sender: currentUser, receiver: currentActiveCallPartner, status: 'hungup' }
             });
 
-            // Tắt giao diện của chính mình luôn
             resetCallInterface();
             alert("Đã kết thúc cuộc gọi.");
         }
 
-        // HÀM RESET TOÀN BỘ GIAO DIỆN PHÒNG CALL VỀ BAN ĐẦU
         function resetCallInterface() {
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
