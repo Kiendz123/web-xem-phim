@@ -16,6 +16,8 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
+    <div id="hidden-voice-container" class="hidden w-0 h-0 absolute pointer-events-none opacity-0"></div>
+
     <div id="auth-container" class="flex flex-col items-center justify-center flex-1 px-4 py-12">
         <div class="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800">
             <h2 id="auth-title" class="text-3xl font-extrabold mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">Cinema Net</h2>
@@ -513,7 +515,7 @@
             }
         }
 
-        // ================= ĐIỀU PHỐI ĐƯỜNG TRUYỀN CALL & ĐỒNG BỘ NÚT CÚP MÁY =================
+        // ================= ĐIỀU PHỐI ĐƯỜNG TRUYỀN CALL & ĐỒNG BỘ TIẾNG GỌI NGẦM =================
         function listenToRealtimeSignals() {
             _supabase.channel('cinema_call_signal_room').on('broadcast', { event: 'call_invite' }, payload => {
                 const signal = payload.payload;
@@ -529,6 +531,10 @@
                         document.getElementById('remote-status').innerText = 'Đã kết nối!';
                         document.getElementById('remote-video').classList.remove('hidden');
                         document.getElementById('hangup-btn').classList.remove('hidden'); 
+                        
+                        // Kích hoạt đường truyền tiếng ngầm của bên gọi điện
+                        startHiddenVoiceBridge(answer.roomName);
+
                     } else if (answer.status === 'rejected') {
                         alert(`❌ Cuộc gọi bị từ chối bởi ${answer.sender}`);
                         resetCallInterface();
@@ -576,16 +582,24 @@
             document.getElementById('call-img-btn').classList.remove('hidden');
             document.getElementById('hangup-btn').classList.remove('hidden'); 
 
+            // Tạo tên phòng voice chat chung duy nhất dựa trên tên 2 người
+            const roomName = `CinemaNet_Voice_${[currentUser, incomingCallerName].sort().join('_')}`;
+
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('local-video').srcObject = localStream;
                 document.getElementById('remote-video').classList.remove('hidden');
 
+                // Báo lại cho bên gọi biết là đã chấp nhận + truyền kèm tên phòng voice chat
                 _supabase.channel('cinema_call_signal_room').send({
                     type: 'broadcast',
                     event: 'call_response',
-                    payload: { sender: currentUser, receiver: incomingCallerName, status: 'accepted' }
+                    payload: { sender: currentUser, receiver: incomingCallerName, status: 'accepted', roomName: roomName }
                 });
+
+                // Kích hoạt đường truyền tiếng ngầm của bên nhận cuộc gọi
+                startHiddenVoiceBridge(roomName);
+
             } catch (err) {
                 alert('Không thể kết nối camera phản hồi: ' + err.message);
                 resetCallInterface();
@@ -599,6 +613,13 @@
                 event: 'call_response',
                 payload: { sender: currentUser, receiver: incomingCallerName, status: 'rejected' }
             });
+        }
+
+        // KÍCH HOẠT ĐƯỜNG TRUYỀN ÂM THANH NGẦM QUA JITSI
+        function startHiddenVoiceBridge(roomName) {
+            const voiceContainer = document.getElementById('hidden-voice-container');
+            // Cấu hình Jitsi chạy ở chế độ chỉ bật audio, ẩn hết thanh công cụ điều khiển
+            voiceContainer.innerHTML = `<iframe src="https://meet.jit.si/${roomName}#config.startWithVideoMuted=true&config.startWithAudioMuted=false&config.prejoinPageEnabled=false&interfaceConfig.TOOLBAR_BUTTONS=[]" allow="microphone; audio"></iframe>`;
         }
 
         function endCurrentCall() {
@@ -621,6 +642,9 @@
             }
             currentActiveCallPartner = '';
             
+            // Xóa bỏ phòng gọi ngầm để ngắt kết nối âm thanh ngay lập tức
+            document.getElementById('hidden-voice-container').innerHTML = '';
+
             document.getElementById('video-grid').classList.add('hidden');
             document.getElementById('call-img-btn').classList.add('hidden');
             document.getElementById('hangup-btn').classList.add('hidden');
