@@ -59,8 +59,8 @@
                 </div>
 
                 <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
-                    <h4 class="text-sm font-bold text-teal-300 mb-2 uppercase tracking-wide">🍿 KHO PHIM & NHẠC:</h4>
-                    <div id="global-movie-list" class="max-h-44 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
+                    <h4 class="text-sm font-bold text-teal-300 mb-2 uppercase tracking-wide">🍿 KHO PHIM & NHẠC (BẤM VÀO TÊN ĐỂ PHÁT CHO CẢ PHÒNG):</h4>
+                    <div id="global-movie-list" class="max-h-44 overflow-y-auto flex flex-col gap-2 text-xs"></div>
                 </div>
 
                 <div class="flex-1 bg-slate-950 rounded-2xl overflow-hidden aspect-video relative border border-slate-800 shadow-2xl">
@@ -192,7 +192,7 @@
             }
 
             loadMovieList();
-            loadUsersToSelect(); // Nạp danh sách thành viên tự động
+            loadUsersToSelect(); 
             listenToMovieUpdates();
             listenToChatMessages();
             loadInitialChat();
@@ -209,7 +209,7 @@
             input.focus();
         }
 
-        // TỰ ĐỘNG TÌM USER TRONG DATABASE ĐỂ HIỂN THỊ THÀNH DANH SÁCH THÀNH VIÊN CHAT
+        // TỰ ĐỘNG TÌM USER ĐỂ HIỂN THỊ TRONG DANH SÁCH CHAT RIÊNG
         async function loadUsersToSelect() {
             const { data } = await _supabase.from('users').select('user');
             const selectEl = document.getElementById('private-target-select');
@@ -242,12 +242,12 @@
                 tPriv.className = "flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/20";
                 tPub.className = "flex-1 py-3 text-slate-400 hover:text-slate-200 transition";
                 selector.classList.remove('hidden');
-                loadUsersToSelect(); // Làm mới danh sách user khi bấm qua tab riêng tư
+                loadUsersToSelect(); 
             }
             loadInitialChat();
         }
 
-        // ================= XỬ LÝ VIDEO TRÁNH TRÙNG LẶP / NHÂN BẢN =================
+        // ================= XỬ LÝ KHO VIDEO (ĐÃ SỬA LỖI XÓA VÀ TRÙNG LẶP) =================
         async function addNewMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             let url = document.getElementById('movie-url').value.trim();
@@ -273,15 +273,18 @@
         }
 
         async function loadMovieList() {
-            const { data } = await _supabase.from('movies').select('*').order('created_at', { ascending: false });
+            const { data, error } = await _supabase.from('movies').select('*').order('created_at', { ascending: false });
+            if (error) { console.log("Lỗi tải kho phim:", error.message); return; }
+            
             const listContainer = document.getElementById('global-movie-list');
             if (data && listContainer) {
                 listContainer.innerHTML = '';
                 let uniqueMovies = [];
-                let seenTitles = new Set();
+                let seenUrls = new Set();
+
                 data.forEach(item => {
-                    if (!seenTitles.has(item.title + item.url)) {
-                        seenTitles.add(item.title + item.url);
+                    if (!seenUrls.has(item.url)) {
+                        seenUrls.add(item.url);
                         uniqueMovies.push(item);
                     }
                 });
@@ -289,13 +292,14 @@
                 uniqueMovies.forEach(m => {
                     let tagColor = 'bg-teal-500/10 text-teal-400';
                     if (m.type === 'direct_file') tagColor = 'bg-amber-500/10 text-amber-400';
+                    if (m.type === 'youtube') tagColor = 'bg-sky-500/10 text-sky-400';
                     
                     listContainer.innerHTML += `
                     <div class="flex justify-between items-center bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 hover:border-teal-500/50 transition">
                         <button onclick="playThisMovie(${m.id})" class="flex-1 text-left truncate font-semibold text-slate-200 hover:text-teal-400 transition">
                             ▶️ ${m.title} <span class="text-[10px] px-1.5 py-0.5 rounded ${tagColor} ml-1">${m.type.toUpperCase()}</span>
                         </button>
-                        ${currentRole === 'admin' ? `<button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold px-2 py-0.5 ml-2 bg-rose-500/10 rounded-lg transition">Xóa</button>` : ''}
+                        ${currentRole === 'admin' ? `<button onclick="deleteMovie(${m.id})" class="text-rose-400 hover:text-rose-600 font-bold px-2 py-0.5 ml-2 bg-rose-500/10 rounded-lg transition-all duration-200 active:scale-95">Xóa</button>` : ''}
                     </div>`;
                 });
             }
@@ -365,7 +369,7 @@
             }
         }
 
-        // ================= FIX CHAT RIÊNG HOÀN TOÀN (ĐỒNG BỘ CỘT "MSG") =================
+        // ================= XỬ LÝ CHAT ĐỒNG BỘ ĐÚNG CỘT DỮ LIỆU BẢNG SUBA =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -382,7 +386,6 @@
                     box.innerHTML = `<div class="text-center text-xs text-slate-500 py-8">Vui lòng chọn một thành viên trong danh sách phía trên để bắt đầu nhắn tin riêng tư...</div>`;
                     return;
                 }
-                // Lọc cuộc hội thoại 2 chiều giữa currentUser và selectedPrivateUser
                 const { data } = await _supabase.from('chats_private')
                     .select('*')
                     .or(`and(sender.eq.${currentUser},receiver.eq.${selectedPrivateUser}),and(sender.eq.${selectedPrivateUser},receiver.eq.${currentUser})`)
@@ -390,7 +393,6 @@
                 
                 if (data) data.forEach(msg => {
                     const label = msg.sender === currentUser ? `Bạn` : msg.sender;
-                    // FIX CHUẨN: Đọc nội dung từ trường "msg" của bảng chats_private
                     let content = msg.msg || ''; 
                     appendMessage(label, content, msg.sender === currentUser, msg.is_image);
                 });
@@ -413,12 +415,10 @@
             _supabase.channel('private_chat_system')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
-                    // Kiểm tra xem tin nhắn riêng mới đẩy lên có thuộc về cuộc hội thoại đang mở hay không
                     const matchCurrentRoom = (info.sender === currentUser && info.receiver === selectedPrivateUser) || 
                                              (info.sender === selectedPrivateUser && info.receiver === currentUser);
                     
                     if (matchCurrentRoom) {
-                        // FIX CHUẨN: Lắng nghe realtime từ cột dữ liệu "msg" của Kiên
                         let content = info.msg || '';
                         if (info.is_image && info.receiver === currentUser) {
                             showSharedImageOnCall(content);
@@ -457,7 +457,6 @@
                 if(error) { console.log("Lỗi gửi chat: ", error.message); }
             } else {
                 if (!selectedPrivateUser) { alert('Vui lòng chọn một thành viên trong danh sách để gửi tin!'); return; }
-                // FIX CHUẨN: Đẩy nội dung tin nhắn riêng vào đúng tên cột là "msg" của bảng chats_private
                 const { error } = await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: selectedPrivateUser, msg: txt, is_image: false }]);
                 if(error) { console.log("Lỗi gửi chat riêng tư: ", error.message); }
             }
