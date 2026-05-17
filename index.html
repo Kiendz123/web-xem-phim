@@ -85,11 +85,14 @@
                         <button onclick="triggerCallImageSend()" id="call-img-btn" class="hidden bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 px-2 py-1 rounded-lg text-[10px] font-bold border border-teal-500/30 transition">🖼️ Truyền Ảnh Nền Call</button>
                     </div>
 
-                    <div class="mb-3 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex items-center gap-2">
-                        <select id="call-target-select" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none">
-                            <option value="">-- Chọn bạn bè để liên lạc --</option>
-                        </select>
-                        <button onclick="startCallToTarget()" id="call-btn" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition">📞 Gọi Điện</button>
+                    <div class="mb-3 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-2">
+                        <div class="flex items-center gap-2">
+                            <select id="call-target-select" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none">
+                                <option value="">-- Chọn bạn bè để liên lạc --</option>
+                            </select>
+                            <button onclick="startCallToTarget()" id="call-btn" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition">📞 Gọi Điện</button>
+                        </div>
+                        <button onclick="endCurrentCall()" id="hangup-btn" class="hidden w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-1.5 rounded-lg text-xs transition shadow-md shadow-rose-500/20">🔴 Kết Thúc Cuộc Gọi (Cúp Máy)</button>
                     </div>
 
                     <div id="video-grid" class="grid grid-cols-2 gap-2 hidden">
@@ -162,7 +165,6 @@
         let selectedPrivateUser = '';
         let localStream = null;
         
-        // Quản lý biến cuộc gọi cuộc gọi lựa chọn
         let currentActiveCallPartner = '';
         let incomingCallerName = '';
 
@@ -216,7 +218,7 @@
             loadUsersToSelect(); 
             listenToMovieUpdates();
             listenToChatMessages();
-            listenToRealtimeSignals(); // Kích hoạt kênh nhận diện tín hiệu gọi điện riêng biệt
+            listenToRealtimeSignals(); 
             loadInitialChat();
         }
 
@@ -489,7 +491,7 @@
             input.value = '';
 
             if (currentChatTab === 'public') {
-                const { error } = await 'chats' ? _supabase.from('chats').insert([{ user: currentUser, text: txt }]) : null;
+                await _supabase.from('chats').insert([{ user: currentUser, text: txt }]);
             } else {
                 if (!selectedPrivateUser) { alert('Vui lòng chọn một thành viên trong danh sách để gửi tin!'); return; }
                 await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: selectedPrivateUser, msg: txt, is_image: false }]);
@@ -511,12 +513,10 @@
             }
         }
 
-        // ================= TÍNH NĂNG MỚI: ĐIỀU PHỐI ĐƯỜNG TRUYỀN GỌI ĐIỆN THEO LỰA CHỌN TÀI KHOẢN =================
+        // ================= ĐIỀU PHỐI ĐƯỜNG TRUYỀN CALL & ĐỒNG BỘ NÚT CÚP MÁY =================
         function listenToRealtimeSignals() {
-            // Lắng nghe tín hiệu thông báo cuộc gọi thời gian thực toàn hệ thống thông qua Broadcast Channel
             _supabase.channel('cinema_call_signal_room').on('broadcast', { event: 'call_invite' }, payload => {
                 const signal = payload.payload;
-                // Nếu bản thân mình là người nhận cuộc gọi này
                 if (signal.receiver === currentUser) {
                     incomingCallerName = signal.sender;
                     document.getElementById('incoming-call-text').innerText = `🔔 [${signal.sender}] đang gọi Video cho bạn...`;
@@ -524,14 +524,18 @@
                 }
             }).on('broadcast', { event: 'call_response' }, payload => {
                 const answer = payload.payload;
-                // Khi người mình gọi phản hồi lại lệnh
-                if (answer.sender === currentActiveCallPartner && answer.receiver === currentUser) {
+                if (answer.receiver === currentUser) {
                     if (answer.status === 'accepted') {
                         document.getElementById('remote-status').innerText = 'Đã kết nối!';
                         document.getElementById('remote-video').classList.remove('hidden');
-                    } else {
+                        document.getElementById('hangup-btn').classList.remove('hidden'); // Hiện nút cúp máy khi thông cuộc gọi
+                    } else if (answer.status === 'rejected') {
                         alert(`❌ Cuộc gọi bị từ chối bởi ${answer.sender}`);
-                        stopLocalCameraTracks();
+                        resetCallInterface();
+                    } else if (answer.status === 'hungup') {
+                        // Nhận tín hiệu cúp máy từ đầu dây bên kia
+                        alert(`🔴 Cuộc gọi đã kết thúc bởi ${answer.sender}`);
+                        resetCallInterface();
                     }
                 }
             }).subscribe();
@@ -546,13 +550,12 @@
             document.getElementById('remote-status').innerText = 'Đang đổ chuông...';
             document.getElementById('video-grid').classList.remove('hidden');
             document.getElementById('call-img-btn').classList.remove('hidden');
+            document.getElementById('hangup-btn').classList.remove('hidden'); // Hiện nút hủy/cúp máy lập tức để bên gọi có thể hủy cuộc gọi khi đang đổ chuông
 
             try {
-                // Bật camera của chính mình lên trước
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('local-video').srcObject = localStream;
                 
-                // Phát tín hiệu mời gọi trực tiếp đến mục tiêu thông qua Supabase Broadcast
                 _supabase.channel('cinema_call_signal_room').send({
                     type: 'broadcast',
                     event: 'call_invite',
@@ -560,6 +563,7 @@
                 });
             } catch (err) {
                 alert('Không mở được thiết bị Camera/Micro: ' + err.message);
+                resetCallInterface();
             }
         }
 
@@ -568,17 +572,16 @@
             currentActiveCallPartner = incomingCallerName;
             
             document.getElementById('remote-user-label').innerText = incomingCallerName;
-            document.getElementById('remote-status').innerText = 'Đã kết nối thành công!';
+            document.getElementById('remote-status').innerText = 'Đã kết nối!';
             document.getElementById('video-grid').classList.remove('hidden');
             document.getElementById('call-img-btn').classList.remove('hidden');
+            document.getElementById('hangup-btn').classList.remove('hidden'); // Hiện nút cúp máy cho bên nhận
 
             try {
-                // Mở camera của mình để tham gia đàm thoại
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('local-video').srcObject = localStream;
-                document.getElementById('remote-video').classList.remove('hidden'); // Giả lập hiển thị luồng nhận
+                document.getElementById('remote-video').classList.remove('hidden');
 
-                // Phản hồi lại lệnh đồng ý
                 _supabase.channel('cinema_call_signal_room').send({
                     type: 'broadcast',
                     event: 'call_response',
@@ -586,12 +589,12 @@
                 });
             } catch (err) {
                 alert('Không thể kết nối camera phản hồi: ' + err.message);
+                resetCallInterface();
             }
         }
 
         function rejectIncomingCall() {
             document.getElementById('incoming-call-box').classList.add('hidden');
-            // Gửi tín hiệu từ chối về cho đầu dây bên kia
             _supabase.channel('cinema_call_signal_room').send({
                 type: 'broadcast',
                 event: 'call_response',
@@ -599,13 +602,39 @@
             });
         }
 
-        function stopLocalCameraTracks() {
+        // HÀM CHỦ ĐỘNG BẤM NÚT CÚP MÁY KẾT THÚC CUỘC GỌI
+        function endCurrentCall() {
+            if (!currentActiveCallPartner) return;
+            
+            // Phát đi tín hiệu kết thúc đến đối phương
+            _supabase.channel('cinema_call_signal_room').send({
+                type: 'broadcast',
+                event: 'call_response',
+                payload: { sender: currentUser, receiver: currentActiveCallPartner, status: 'hungup' }
+            });
+
+            // Tắt giao diện của chính mình luôn
+            resetCallInterface();
+            alert("Đã kết thúc cuộc gọi.");
+        }
+
+        // HÀM RESET TOÀN BỘ GIAO DIỆN PHÒNG CALL VỀ BAN ĐẦU
+        function resetCallInterface() {
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
             }
+            currentActiveCallPartner = '';
+            
             document.getElementById('video-grid').classList.add('hidden');
             document.getElementById('call-img-btn').classList.add('hidden');
+            document.getElementById('hangup-btn').classList.add('hidden');
+            document.getElementById('remote-video').classList.add('hidden');
+            document.getElementById('remote-image-display').classList.add('hidden');
+            document.getElementById('remote-status').innerText = 'Đang chờ kết nối...';
+            document.getElementById('remote-status').classList.remove('hidden');
+            document.getElementById('remote-user-label').innerText = 'Đang chờ';
+            document.getElementById('call-target-select').value = '';
         }
 
         async function triggerCallImageSend() {
