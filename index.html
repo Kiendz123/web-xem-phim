@@ -457,13 +457,14 @@
             _supabase.channel('private_chat_system')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
-                    const matchCurrentRoom = (info.sender === currentUser && info.receiver === selectedPrivateUser) || 
-                                             (info.sender === selectedPrivateUser && info.receiver === currentUser);
-                    if (matchCurrentRoom) {
-                        if (info.is_image && info.receiver === currentUser) { showSharedImageOnCall(info.msg); }
+                    
+                    // CHỈ BẮT TIN NHẮN TỪ ĐỐI PHƯƠNG TRUYỀN ĐẾN ĐỂ TRÁNH TRÙNG LẶP DO ĐÃ CÓ LOCAL RENDER
+                    const isIncomingFromPartner = (info.sender === selectedPrivateUser && info.receiver === currentUser);
+                    
+                    if (isIncomingFromPartner) {
+                        if (info.is_image) { showSharedImageOnCall(info.msg); }
                         if (currentChatTab === 'private') {
-                            const label = info.sender === currentUser ? `Bạn` : info.sender;
-                            appendMessage(label, info.msg || '', info.sender === currentUser, info.is_image);
+                            appendMessage(info.sender, info.msg || '', false, info.is_image);
                             document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                         }
                     }
@@ -497,16 +498,34 @@
             box.appendChild(msgEl);
         }
 
+        // ĐÃ ĐƯỢC TỐI ƯU SỬA LỖI LAG PHÒNG CHAT RIÊNG (LOCAL RENDER KHÔNG CẦN F5)
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
             const txt = input.value.trim();
             if (!txt) return;
             input.value = '';
+            
             if (currentChatTab === 'public') {
                 await _supabase.from('chats').insert([{ user: currentUser, text: txt }]);
             } else {
                 if (!selectedPrivateUser) return;
-                await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: selectedPrivateUser, msg: txt, is_image: false }]);
+                
+                // 1. Đẩy đồng bộ lên Database Supabase ngầm
+                const { error } = await _supabase.from('chats_private').insert([
+                    { sender: currentUser, receiver: selectedPrivateUser, msg: txt, is_image: false }
+                ]);
+                
+                if (error) {
+                    console.error("Lỗi gửi tin nhắn:", error.message);
+                    return;
+                }
+                
+                // 2. Local Render: Tự động in luôn dòng chữ của mình ra giao diện để triệt tiêu độ trễ mạng
+                appendMessage('Bạn', txt, true, false);
+                
+                // 3. Cuộn mượt màn hình chat xuống dưới cùng
+                const chatBox = document.getElementById('chat-messages');
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
         }
 
@@ -633,7 +652,6 @@
             }
         }
 
-        // Bọc lỗi linh hoạt Audio Only như phương án dự phòng
         async function startCallToTarget() {
             const target = document.getElementById('call-target-select').value;
             if (!target) { alert("Vui lòng chọn 1 người bạn!"); return; }
