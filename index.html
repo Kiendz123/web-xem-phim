@@ -56,6 +56,11 @@
                         <input type="text" id="movie-url" placeholder="Link YT / TikTok hoặc Link File (.mp4)..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
                         <button onclick="addNewMovieLink()" class="bg-teal-500 hover:bg-teal-600 text-slate-950 font-bold rounded-xl text-sm transition py-2.5">Thêm Vào Kho Lưu Trữ</button>
                     </div>
+                    
+                    <div class="border-t border-slate-800/80 pt-3 mt-1 flex items-center justify-between">
+                        <span class="text-xs text-slate-400">Tính năng quản trị tin nhắn:</span>
+                        <button onclick="clearChatDatabase()" class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-md shadow-rose-500/10 active:scale-95">🧹 Xóa Sạch Lịch Sử Chat Phòng Hiện Tại</button>
+                    </div>
                 </div>
 
                 <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
@@ -209,7 +214,6 @@
             input.focus();
         }
 
-        // TỰ ĐỘNG TÌM USER ĐỂ HIỂN THỊ TRONG DANH SÁCH CHAT RIÊNG
         async function loadUsersToSelect() {
             const { data } = await _supabase.from('users').select('user');
             const selectEl = document.getElementById('private-target-select');
@@ -247,7 +251,7 @@
             loadInitialChat();
         }
 
-        // ================= XỬ LÝ KHO VIDEO (ĐÃ SỬA LỖI XÓA VÀ TRÙNG LẶP) =================
+        // ================= XỬ LÝ KHO VIDEO =================
         async function addNewMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             let url = document.getElementById('movie-url').value.trim();
@@ -369,7 +373,7 @@
             }
         }
 
-        // ================= XỬ LÝ CHAT ĐỒNG BỘ ĐÚNG CỘT DỮ LIỆU BẢNG SUBA =================
+        // ================= XỬ LÝ CHAT DỮ LIỆU & REALTIME BIẾN MẤT KHI DỌN DEP =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -410,6 +414,12 @@
                         appendMessage(sender, content, sender === currentUser);
                         document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                     }
+                })
+                // LẮNG NGHE LỆNH DỌN CHAT NHÓM TOÀN CỤC
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chats' }, () => {
+                    if (currentChatTab === 'public') {
+                        document.getElementById('chat-messages').innerHTML = `<div class="text-center text-xs text-rose-400 py-4">🧹 Lịch sử cuộc trò chuyện nhóm đã được Admin dọn sạch.</div>`;
+                    }
                 }).subscribe();
 
             _supabase.channel('private_chat_system')
@@ -428,6 +438,12 @@
                             appendMessage(label, content, info.sender === currentUser, info.is_image);
                             document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                         }
+                    }
+                })
+                // LẮNG NGHE LỆNH DỌN CHAT RIÊNG TOÀN CỤC
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chats_private' }, () => {
+                    if (currentChatTab === 'private') {
+                        document.getElementById('chat-messages').innerHTML = `<div class="text-center text-xs text-rose-400 py-4">🧹 Lịch sử cuộc trò chuyện riêng tư đã được dọn dẹp.</div>`;
                     }
                 }).subscribe();
         }
@@ -459,6 +475,38 @@
                 if (!selectedPrivateUser) { alert('Vui lòng chọn một thành viên trong danh sách để gửi tin!'); return; }
                 const { error } = await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: selectedPrivateUser, msg: txt, is_image: false }]);
                 if(error) { console.log("Lỗi gửi chat riêng tư: ", error.message); }
+            }
+        }
+
+        // ================= TÍNH NĂNG MỚI: HÀM ĐIỀU HÀNH DỌN DẸP DATABASE CHAT CỦA ADMIN =================
+        async function clearChatDatabase() {
+            if (currentChatTab === 'public') {
+                if (confirm("⚠️ Chú ý: Bạn có chắc chắn muốn xóa SẠCH TOÀN BỘ tin nhắn ở Phòng Nhóm không? Hành động này không thể hoàn tác!")) {
+                    // Xóa tất cả dữ liệu bằng cách quét các dòng có ID lớn hơn 0 (vì Supabase yêu cầu điều kiện khi xóa hàng loạt công khai)
+                    const { error } = await _supabase.from('chats').delete().gt('id', 0);
+                    if (error) { alert("Lỗi khi dọn dẹp chat nhóm: " + error.message); } 
+                    else { 
+                        document.getElementById('chat-messages').innerHTML = '';
+                        alert("Đã xóa sạch lịch sử chat nhóm công khai!"); 
+                    }
+                }
+            } else {
+                if (!selectedPrivateUser) { 
+                    alert("Hãy chọn một tài khoản cụ thể trong danh sách chat riêng tư để dọn dẹp cuộc trò chuyện đó!"); 
+                    return; 
+                }
+                if (confirm(`Bạn có muốn xóa toàn bộ lịch sử chat riêng tư giữa bạn và [${selectedPrivateUser}] không?`)) {
+                    // Chỉ xóa các tin nhắn riêng của cặp đôi đang hội thoại này
+                    const { error } = await _supabase.from('chats_private')
+                        .delete()
+                        .or(`and(sender.eq.${currentUser},receiver.eq.${selectedPrivateUser}),and(sender.eq.${selectedPrivateUser},receiver.eq.${currentUser})`);
+                    
+                    if (error) { alert("Lỗi khi dọn chat riêng: " + error.message); } 
+                    else { 
+                        document.getElementById('chat-messages').innerHTML = '';
+                        alert(`Đã dọn dẹp cuộc trò chuyện riêng với ${selectedPrivateUser}!`); 
+                    }
+                }
             }
         }
 
