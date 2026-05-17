@@ -146,11 +146,18 @@
                 </div>
 
                 <div class="flex-1 flex flex-col overflow-hidden bg-slate-950/20">
-                    <div id="private-selector-box" class="hidden p-3 bg-slate-950/80 border-b border-slate-900 flex flex-col gap-1.5 text-xs">
+                    <div id="private-selector-box" class="hidden p-3 bg-slate-950/80 border-b border-slate-900 flex flex-col gap-2 text-xs">
                         <span class="text-teal-400 font-black uppercase tracking-widest text-[9px]">👥 Chọn thành viên muốn nhắn tin riêng:</span>
                         <select id="private-target-select" onchange="selectPrivateUser()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-semibold focus:outline-none focus:border-teal-500">
                             <option value="">-- Bấm vào đây để chọn người nhận --</option>
                         </select>
+
+                        <div class="mt-1 flex flex-col gap-1.5">
+                            <span class="text-slate-400 text-[9px] font-bold uppercase tracking-wider">📬 Danh sách hộp thư đến:</span>
+                            <div id="private-inbox-list" class="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1">
+                                <div class="text-[10px] text-slate-600 text-center py-1">Chưa có thông báo tin nhắn nào...</div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-4 text-xs"></div>
@@ -185,6 +192,9 @@
         let currentChatTab = 'public'; 
         let selectedPrivateUser = '';
         
+        // Object quản lý trạng thái đọc tin nhắn của từng người gửi: { username: 'unread' / 'read' }
+        let inboxStates = {};
+
         let localStream = null;
         let peerConnection = null;
         let currentActiveCallPartner = '';
@@ -240,7 +250,6 @@
             document.getElementById('auth-container').classList.add('hidden');
             document.getElementById('main-container').classList.remove('hidden');
             
-            // Hiện icon vương miện cho Admin ở thanh tiêu đề
             const roleBadge = (currentRole === 'admin') ? '👑 ADMIN' : '👤 MEMBER';
             document.getElementById('user-display').innerHTML = `<span class="${currentRole === 'admin' ? 'text-rose-400 font-black' : 'text-teal-400'}">${roleBadge}: ${username}</span>`;
 
@@ -254,6 +263,7 @@
             listenToChatMessages();
             listenToRealtimeSignals(); 
             loadInitialChat();
+            loadInitialInboxList(); // Tải danh sách những người từng nhắn tin riêng
         }
 
         function handleLogout() {
@@ -287,6 +297,19 @@
 
         function selectPrivateUser() {
             selectedPrivateUser = document.getElementById('private-target-select').value;
+            if (selectedPrivateUser) {
+                inboxStates[selectedPrivateUser] = 'read'; // Đánh dấu đã xem người này
+                renderInboxList();
+            }
+            loadInitialChat();
+        }
+
+        // Hàm click nhanh vào danh sách thông báo tin nhắn để mở chat
+        function openChatFromInbox(partnerName) {
+            selectedPrivateUser = partnerName;
+            document.getElementById('private-target-select').value = partnerName;
+            inboxStates[partnerName] = 'read'; // Cập nhật sang trạng thái Đã xem
+            renderInboxList();
             loadInitialChat();
         }
 
@@ -305,9 +328,9 @@
                 tPub.className = "flex-1 py-3 text-slate-500 hover:text-slate-300 transition";
                 selector.classList.remove('hidden');
                 
-                // Khi bấm vào tab riêng tư, ẩn chấm đỏ thông báo tổng đi
                 document.getElementById('private-badge').classList.add('hidden');
-                loadUsersToSelect(); 
+                loadUsersToSelect();
+                renderInboxList();
             }
             loadInitialChat();
         }
@@ -429,7 +452,50 @@
             }
         }
 
-        // ================= XỬ LÝ CHAT DỮ LIỆU & ĐÃ THÊM DÒNG THÔNG BÁO TIN MỚI NÂNG CAO =================
+        // ================= XỬ LÝ LỊCH SỬ HỘP THƯ ĐẾN (INBOX LIST) =================
+        async function loadInitialInboxList() {
+            const { data } = await _supabase.from('chats_private')
+                .select('sender')
+                .eq('receiver', currentUser);
+            
+            if (data) {
+                data.forEach(msg => {
+                    if (msg.sender && !inboxStates[msg.sender]) {
+                        inboxStates[msg.sender] = 'read'; // Khởi tạo ban đầu coi như đã xem
+                    }
+                });
+            }
+            renderInboxList();
+        }
+
+        // Vẽ giao diện danh sách những người gửi tin có nhãn Chưa đọc / Đã xem
+        function renderInboxList() {
+            const container = document.getElementById('private-inbox-list');
+            if (!container) return;
+
+            const senders = Object.keys(inboxStates);
+            if (senders.length === 0) {
+                container.innerHTML = `<div class="text-[10px] text-slate-600 text-center py-1">Chưa có thông báo tin nhắn nào...</div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            senders.forEach(senderName => {
+                const isUnread = inboxStates[senderName] === 'unread';
+                const badgeClass = isUnread ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-slate-900 text-slate-500 border-slate-800';
+                const badgeText = isUnread ? '🔴 Chưa đọc' : '🟢 Đã xem';
+                const textHighlight = isUnread ? 'text-white font-bold' : 'text-slate-400';
+
+                container.innerHTML += `
+                    <div onclick="openChatFromInbox('${senderName}')" class="flex justify-between items-center p-2 rounded-xl bg-slate-950/40 border border-slate-900/60 hover:border-teal-500/30 cursor-pointer transition">
+                        <span class="font-medium text-[11px] ${textHighlight}">👤 ${senderName}</span>
+                        <span class="text-[9px] px-2 py-0.5 rounded border ${badgeClass} font-bold">${badgeText}</span>
+                    </div>
+                `;
+            });
+        }
+
+        // ================= XỬ LÝ CHAT DỮ LIỆU CHÍNH =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -468,24 +534,23 @@
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
                     
-                    // KIỂM TRA TIN NHẮN RIÊNG ĐƯỢC GỬI ĐẾN TÀI KHOẢN CỦA MÌNH
                     if (info.receiver === currentUser) {
-                        
-                        // Nếu đang ở phòng chat với đúng người đó, vẽ tin nhắn lên ngay
+                        // CẬP NHẬT TRẠNG THÁI CHƯA ĐỌC VÀO HỘP THƯ
                         if (info.sender === selectedPrivateUser && currentChatTab === 'private') {
+                            inboxStates[info.sender] = 'read';
                             if (info.is_image) { showSharedImageOnCall(info.msg); }
                             appendMessage(info.sender, info.msg || '', false, info.is_image);
                             document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                         } else {
-                            // CẢI TIẾN: NẾU ĐANG XEM PHIM HOẶC CHAT PHÒNG CHUNG, BẬT CHẤM ĐỎ VÀ HIỆN DÒNG THÔNG BÁO TOAST
+                            inboxStates[info.sender] = 'unread';
                             document.getElementById('private-badge').classList.remove('hidden');
                             showNotificationToast(info.sender, info.is_image ? "Đã gửi 1 hình ảnh..." : info.msg);
                         }
+                        renderInboxList(); // Vẽ lại danh sách tin nhắn để cập nhật nhãn Chưa đọc
                     }
                 }).subscribe();
         }
 
-        // Hàm tạo dòng thông báo nổi (Toast Notification) biến mất sau 4 giây
         function showNotificationToast(sender, content) {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -495,7 +560,7 @@
                     <span class="font-black text-teal-400 uppercase tracking-wider text-[10px]">📩 Tin nhắn riêng mới</span>
                     <span class="text-[9px] text-slate-500 font-bold">Vừa xong</span>
                 </div>
-                <p class="font-bold text-slate-100">👑 ${sender}:</p>
+                <p class="font-bold text-slate-100">👤 ${sender}:</p>
                 <p class="text-slate-400 truncate mt-0.5">${content}</p>
             `;
             container.appendChild(toast);
@@ -571,7 +636,7 @@
             }
         }
 
-        // ================= XỬ LÝ WEBRTC TOÀN DIỆN (LUỒNG THOẠI CẢI TIẾN) =================
+        // ================= XỬ LÝ WEBRTC TOÀN DIỆN (LUỒNG THOẠI FIX LỖI QUYỀN THIẾT BỊ) =================
         function listenToRealtimeSignals() {
             signalChannel = _supabase.channel('cinema_call_signal_room');
 
@@ -703,7 +768,7 @@
                     document.getElementById('local-video').classList.add('hidden'); 
                     alert('Chuyển sang chế độ gọi thoại (Không hình) do thiết bị chặn máy ảnh!');
                 } catch (audioErr) {
-                    alert('Lỗi quyền thiết bị: Trình duyệt bị khóa hoàn toàn quyền truy cập Micro/Camera.');
+                    alert('Lỗi quyền thiết bị: Trình duyệt trên máy bạn đang chặn quyền Micro/Camera. Hãy vào cài đặt trang web đổi thành "Cho phép".');
                     resetCallInterface();
                     return;
                 }
@@ -737,7 +802,7 @@
                     localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
                     document.getElementById('local-video').classList.add('hidden');
                 } catch (audioErr) {
-                    alert('Không mở được micro để nhận cuộc gọi.');
+                    alert('Không mở được micro hoặc camera để nhận cuộc gọi.');
                     resetCallInterface();
                     return;
                 }
