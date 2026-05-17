@@ -6,6 +6,7 @@
     <title>Cinema Net Premium - Group Watch & Video Call</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://8x8.vc/external_api.js"></script>
     <style>
         body { background-color: #0b0f19; color: #f1f5f9; font-family: system-ui, sans-serif; }
         iframe, video { background-color: #000; border-radius: 12px; width: 100%; height: 100%; }
@@ -78,7 +79,7 @@
             <div class="bg-slate-900/40 border border-slate-800 rounded-2xl flex flex-col h-[700px] xl:h-auto overflow-hidden">
                 <div class="p-4 border-b border-slate-800 bg-slate-900/80">
                     <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">📹 Phòng Gọi Điện Truyền Hình</h3>
+                        <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">📹 Phòng Gọi Điện Đường Truyền</h3>
                         <button onclick="triggerCallImageSend()" id="call-img-btn" class="hidden bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 px-2 py-1 rounded-lg text-[10px] font-bold border border-teal-500/30 transition">🖼️ Truyền Ảnh Nền Call</button>
                     </div>
 
@@ -92,22 +93,11 @@
                         <button onclick="endCurrentCall()" id="hangup-btn" class="hidden w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-1.5 rounded-lg text-xs transition">🔴 Kết Thúc Cuộc Gọi (Cúp Máy)</button>
                     </div>
 
-                    <div id="audio-status-bar" class="hidden mb-2 text-center p-1.5 rounded-lg text-xs font-bold bg-slate-950 border border-slate-800 text-slate-400">
-                        <span id="audio-indicator-text">🎙️ Hệ thống âm thanh: Đang kết nối...</span>
-                    </div>
-
-                    <div id="video-grid" class="grid grid-cols-2 gap-2 hidden">
-                        <div class="bg-slate-950 aspect-video rounded-xl overflow-hidden relative border border-slate-800">
-                            <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-                            <span class="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-[9px] px-2 py-0.5 rounded-md text-slate-300">Bạn</span>
-                        </div>
-                        <div class="bg-slate-950 aspect-video rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
-                            <video id="remote-video" autoplay playsinline class="w-full h-full object-cover hidden"></video>
-                            <div id="remote-image-display" class="w-full h-full hidden bg-slate-900 flex items-center justify-center p-1">
-                                <img id="call-shared-img" class="max-w-full max-h-full object-contain rounded-lg shadow-md" src="">
-                            </div>
-                            <span id="remote-status" class="text-[10px] text-slate-500 font-medium">Đang đổ chuông...</span>
-                            <span id="remote-user-label" class="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-[9px] px-2 py-0.5 rounded-md text-slate-300">Đang chờ</span>
+                    <div id="video-grid" class="hidden w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-800 relative">
+                        <div id="jitsi-meet-container" class="w-full h-[220px]"></div>
+                        <div id="remote-image-display" class="w-full h-[220px] hidden bg-slate-900 absolute inset-0 flex items-center justify-center p-1 z-10">
+                            <img id="call-shared-img" class="max-w-full max-h-full object-contain rounded-lg shadow-md" src="">
+                            <button onclick="closeSharedImage()" class="absolute top-2 right-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded">Đóng ảnh</button>
                         </div>
                     </div>
 
@@ -160,19 +150,11 @@
         let currentChatTab = 'public'; 
         let selectedPrivateUser = '';
         
-        // Cấu hình WebRTC kết nối đàm thoại
-        let localStream = null;
-        let peerConnection = null;
-        let audioContext = null;
-        let audioAnalyser = null;
-        let audioInterval = null;
-        
+        // Quản lý Jitsi Call
+        let jitsiApi = null;
         let currentActiveCallPartner = '';
         let incomingCallerName = '';
         let signalChannel = null;
-
-        // Sử dụng máy chủ STUN miễn phí của Google để dò tìm IP/Cổng mạng của 2 máy
-        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         window.onload = function() {
             const savedUser = localStorage.getItem('cinema_user');
@@ -486,7 +468,7 @@
             }
         }
 
-        // ================= ĐỒNG BỘ ĐẦU NỐI ĐƯỜNG TRUYỀN GỌI ĐIỆN VÀ TRAO ĐỔI TÍN HIỆU WEBRTC P2P =================
+        // ================= HỆ THỐNG ĐỒNG BỘ CALL ĐƯỜNG TRUYỀN HẠ TẦNG MẠNG JITSI CORE =================
         function listenToRealtimeSignals() {
             signalChannel = _supabase.channel('cinema_call_signal_room');
 
@@ -494,192 +476,82 @@
                 const signal = payload.payload;
                 if (signal.receiver === currentUser) {
                     incomingCallerName = signal.sender;
-                    document.getElementById('incoming-call-text').innerText = `🔔 [${signal.sender}] đang gọi cho bạn...`;
+                    document.getElementById('incoming-call-text').innerText = `🔔 [${signal.sender}] đang mời bạn vào cuộc gọi nhóm...`;
                     document.getElementById('incoming-call-box').classList.remove('hidden');
                 }
             })
-            .on('broadcast', { event: 'call_response' }, async payload => {
+            .on('broadcast', { event: 'call_response' }, payload => {
                 const answer = payload.payload;
                 if (answer.receiver === currentUser) {
                     if (answer.status === 'accepted') {
-                        document.getElementById('remote-status').innerText = 'Đang đồng bộ thoại...';
-                        document.getElementById('remote-video').classList.remove('hidden');
-                        document.getElementById('hangup-btn').classList.remove('hidden'); 
-                        
-                        // Bước 1: Máy gọi (Bên A) khởi tạo kết nối mạng Peer
-                        await setupPeerConnection();
-                        
-                        // Bước 2: Tạo Offer định tuyến kết nối gửi sang cho Máy nhận (Bên B)
-                        const offer = await peerConnection.createOffer();
-                        await peerConnection.setLocalDescription(offer);
-                        
-                        signalChannel.send({
-                            type: 'broadcast',
-                            event: 'webrtc_offer',
-                            payload: { sdp: offer, sender: currentUser, receiver: currentActiveCallPartner }
-                        });
+                        // Tạo tên phòng ngẫu nhiên duy nhất cho 2 người dựa trên bảng chữ cái xếp tăng dần
+                        const roomName = [currentUser, currentActiveCallPartner].sort().join("_") + "_cinema_premium";
+                        initJitsiMeetingCore(roomName);
                     } else {
-                        alert(`Cuộc gọi kết thúc hoặc bị từ chối.`);
+                        alert(`Cuộc gọi đã kết thúc hoặc bị từ chối.`);
                         resetCallInterface();
                     }
-                }
-            })
-            .on('broadcast', { event: 'webrtc_offer' }, async payload => {
-                const data = payload.payload;
-                // Bước 3: Máy nhận (Bên B) hứng Offer từ bên A truyền sang
-                if (data.receiver === currentUser) {
-                    await setupPeerConnection();
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                    
-                    // Bước 4: Máy nhận tạo Answer phản hồi lại cấu hình gửi ngược về bên A
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    
-                    signalChannel.send({
-                        type: 'broadcast',
-                        event: 'webrtc_answer',
-                        payload: { sdp: answer, sender: currentUser, receiver: data.sender }
-                    });
-                }
-            })
-            .on('broadcast', { event: 'webrtc_answer' }, async payload => {
-                const data = payload.payload;
-                // Bước 5: Máy gọi (Bên A) nhận cấu hình phản hồi của bên B để mở khóa thông luồng thoại
-                if (data.receiver === currentUser && peerConnection) {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                }
-            })
-            .on('broadcast', { event: 'ice_candidate' }, async payload => {
-                const data = payload.payload;
-                // Liên tục trao đổi cổng kết nối Internet realtime giữa hai bên
-                if (data.receiver === currentUser && peerConnection) {
-                    try {
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                    } catch (e) { console.error("Lỗi đồng bộ cổng kết nối mạng:", e); }
                 }
             })
             .subscribe();
         }
 
-        // KHỞI TẠO ĐẦU NỐI ĐƯỜNG TRUYỀN KHÔNG DÂY (PEER CONNECTION)
-        async function setupPeerConnection() {
-            peerConnection = new RTCPeerConnection(rtcConfig);
-            
-            // Đẩy luồng Mic/Cam của mình vào cổng truyền dữ liệu
-            if (localStream) {
-                localStream.getTracks().forEach(track => {
-                    peerConnection.addTrack(track, localStream);
-                });
-            }
+        // KHỞI CHẠY KHUNG TRUYỀN ÂM THANH/HÌNH ẢNH CHUYÊN NGHIỆP QUA SERVER JITSI VÔ ĐỊCH
+        function initJitsiMeetingCore(roomName) {
+            document.getElementById('video-grid').classList.remove('hidden');
+            document.getElementById('call-img-btn').classList.remove('hidden');
+            document.getElementById('hangup-btn').classList.remove('hidden');
 
-            // Khi nhận được luồng Mic/Cam của đối phương truyền sang thành công
-            peerConnection.ontrack = event => {
-                const remoteVideo = document.getElementById('remote-video');
-                if (remoteVideo && event.streams[0]) {
-                    remoteVideo.srcObject = event.streams[0];
-                    remoteVideo.classList.remove('hidden');
-                    document.getElementById('remote-status').innerText = 'Đã kết nối!';
+            const domain = "8x8.vc";
+            const options = {
+                roomName: "vpaas-magic-cookie-29656df934f14ba4ba3772274b0fbefb/" + roomName,
+                width: "100%",
+                height: 220,
+                parentNode: document.getElementById('jitsi-meet-container'),
+                userInfo: { displayName: currentUser },
+                configOverwrite: {
+                    startWithAudioMuted: false,
+                    startWithVideoMuted: false,
+                    prejoinPageEnabled: false, // Bỏ qua màn hình chờ, bấm phát vào nói chuyện luôn
+                    disableDeepLinking: true,
+                    toolbarButtons: ['microphone', 'camera'] // Chỉ giữ nút bật tắt mic/cam cho gọn đẹp
+                },
+                interfaceConfigOverwrite: {
+                    SHOW_JITSI_WATERMARK: false,
+                    VIDEO_LAYOUT_FIT: 'both'
                 }
             };
 
-            // Tìm kiếm các cổng kết nối mạng Internet tối ưu và gửi realtime cho đối phương
-            peerConnection.onicecandidate = event => {
-                if (event.candidate && signalChannel) {
-                    signalChannel.send({
-                        type: 'broadcast',
-                        event: 'ice_candidate',
-                        payload: { candidate: event.candidate, receiver: currentActiveCallPartner }
-                    });
-                }
-            };
-        }
-
-        // HÀM KIỂM TRA SOUND VOLUME CỦA MICRO ĐỂ BÁO ĐÈN TRẠNG THÁI TRUYỀN TIẾNG
-        function startAudioMonitoring(stream) {
-            try {
-                window.AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioContext = new AudioContext();
-                const source = audioContext.createMediaStreamSource(stream);
-                audioAnalyser = audioContext.createAnalyser();
-                audioAnalyser.fftSize = 256;
-                source.connect(audioAnalyser);
-                
-                const bufferLength = audioAnalyser.frequencyBinCount;
-                const dataArray = new Uint8Array(bufferLength);
-                
-                const bar = document.getElementById('audio-status-bar');
-                const txt = document.getElementById('audio-indicator-text');
-                bar.classList.remove('hidden');
-
-                audioInterval = setInterval(() => {
-                    audioAnalyser.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
-                    let average = sum / bufferLength;
-
-                    if (average > 5) { 
-                        bar.className = "mb-2 text-center p-1.5 rounded-lg text-xs font-bold bg-emerald-950 border border-emerald-500/40 text-emerald-400 transition-all duration-150 animate-pulse";
-                        txt.innerText = "🎤 ĐANG TRUYỀN TIẾNG PHÁT RA... (MICRO HOẠT ĐỘNG)";
-                    } else { 
-                        bar.className = "mb-2 text-center p-1.5 rounded-lg text-xs font-bold bg-slate-950 border border-slate-800 text-slate-400 transition-all duration-150";
-                        txt.innerText = "🔇 Micro đang bật nhưng chưa có tiếng nói...";
-                    }
-                }, 300);
-            } catch (e) { console.log(e); }
+            // Tiến hành mở luồng
+            jitsiApi = new JitsiMeetExternalAPI(domain, options);
         }
 
         async function startCallToTarget() {
             const target = document.getElementById('call-target-select').value;
-            if (!target) { alert("Vui lòng chọn 1 người bạn trong danh sách trước khi nhấn Gọi Điện!"); return; }
+            if (!target) { alert("Vui lòng chọn 1 người bạn muốn kết nối đàm thoại!"); return; }
             
             currentActiveCallPartner = target;
-            document.getElementById('remote-user-label').innerText = target;
-            document.getElementById('remote-status').innerText = 'Đang đổ chuông...';
-            document.getElementById('video-grid').classList.remove('hidden');
-            document.getElementById('call-img-btn').classList.remove('hidden');
-            document.getElementById('hangup-btn').classList.remove('hidden'); 
-
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('local-video').srcObject = localStream;
-                startAudioMonitoring(localStream);
-
-                signalChannel.send({
-                    type: 'broadcast',
-                    event: 'call_invite',
-                    payload: { sender: currentUser, receiver: target }
-                });
-            } catch (err) {
-                alert('Không mở được thiết bị Camera/Micro: ' + err.message);
-                resetCallInterface();
-            }
+            signalChannel.send({
+                type: 'broadcast',
+                event: 'call_invite',
+                payload: { sender: currentUser, receiver: target }
+            });
+            alert(`Đang phát tín hiệu kết nối đến [${target}]... Hãy đợi đối phương ấn Nghe.`);
         }
 
         async function acceptIncomingCall() {
             document.getElementById('incoming-call-box').classList.add('hidden');
             currentActiveCallPartner = incomingCallerName;
-            
-            document.getElementById('remote-user-label').innerText = incomingCallerName;
-            document.getElementById('remote-status').innerText = 'Đang kết nối thoại...';
-            document.getElementById('video-grid').classList.remove('hidden');
-            document.getElementById('call-img-btn').classList.remove('hidden');
-            document.getElementById('hangup-btn').classList.remove('hidden'); 
 
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('local-video').srcObject = localStream;
-                startAudioMonitoring(localStream);
+            signalChannel.send({
+                type: 'broadcast',
+                event: 'call_response',
+                payload: { sender: currentUser, receiver: incomingCallerName, status: 'accepted' }
+            });
 
-                // Báo lại cho bên gọi biết là đã nghe để bắt đầu quy trình bắt tay WebRTC
-                signalChannel.send({
-                    type: 'broadcast',
-                    event: 'call_response',
-                    payload: { sender: currentUser, receiver: incomingCallerName, status: 'accepted' }
-                });
-            } catch (err) {
-                alert('Không thể kết nối camera phản hồi: ' + err.message);
-                resetCallInterface();
-            }
+            // Đồng thời kích hoạt luôn luồng phòng bên mình
+            const roomName = [currentUser, incomingCallerName].sort().join("_") + "_cinema_premium";
+            initJitsiMeetingCore(roomName);
         }
 
         function rejectIncomingCall() {
@@ -694,8 +566,7 @@
         }
 
         function endCurrentCall() {
-            if (!currentActiveCallPartner) return;
-            if(signalChannel) {
+            if (currentActiveCallPartner && signalChannel) {
                 signalChannel.send({
                     type: 'broadcast',
                     event: 'call_response',
@@ -706,26 +577,16 @@
         }
 
         function resetCallInterface() {
-            if (audioInterval) clearInterval(audioInterval);
-            if (audioContext) { try { audioContext.close(); } catch(e){} }
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
+            if (jitsiApi) {
+                jitsiApi.dispose();
+                jitsiApi = null;
             }
             currentActiveCallPartner = '';
-            document.getElementById('audio-status-bar').classList.add('hidden');
+            document.getElementById('jitsi-meet-container').innerHTML = '';
             document.getElementById('video-grid').classList.add('hidden');
             document.getElementById('call-img-btn').classList.add('hidden');
             document.getElementById('hangup-btn').classList.add('hidden');
-            document.getElementById('remote-video').classList.add('hidden');
             document.getElementById('remote-image-display').classList.add('hidden');
-            document.getElementById('remote-status').innerText = 'Đang chờ kết nối...';
-            document.getElementById('remote-status').classList.remove('hidden');
-            document.getElementById('remote-user-label').innerText = 'Đang chờ';
             document.getElementById('call-target-select').value = '';
         }
 
@@ -737,10 +598,12 @@
         }
 
         function showSharedImageOnCall(url) {
-            document.getElementById('remote-status').classList.add('hidden');
-            document.getElementById('remote-video').classList.add('hidden');
             document.getElementById('call-shared-img').src = url;
             document.getElementById('remote-image-display').classList.remove('hidden');
+        }
+
+        function closeSharedImage() {
+            document.getElementById('remote-image-display').classList.add('hidden');
         }
     </script>
 </body>
