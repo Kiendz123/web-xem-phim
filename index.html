@@ -56,7 +56,6 @@
                         <input type="text" id="movie-url" placeholder="Link YT / TikTok hoặc Link File (.mp4)..." class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500">
                         <button onclick="addNewMovieLink()" class="bg-teal-500 hover:bg-teal-600 text-slate-950 font-bold rounded-xl text-sm transition py-2.5">Thêm Vào Kho Lưu Trữ</button>
                     </div>
-                    <p class="text-[11px] text-slate-400 italic">*Mẹo: Hệ thống tự nhận biết link file video trực tiếp (.mp4, .m3u8, link get sẵn) để chạy trình phát mượt không quảng cáo.</p>
                 </div>
 
                 <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
@@ -164,6 +163,7 @@
             if (!userVal || !passVal) { alert('Vui lòng điền đủ thông tin!'); return; }
 
             if (isLoginMode) {
+                // SỬA: Ép tìm đúng bảng "users" viết bằng tiếng Anh đồng bộ với database của Kiên
                 const { data, error } = await _supabase.from('users').select('*').eq('user', userVal).eq('pass', passVal);
                 if (error) { alert('Hệ thống lỗi: ' + error.message); } 
                 else if (data && data.length > 0) { loginSuccess(data[0]['user'], data[0]['role'] || 'user'); } 
@@ -225,17 +225,15 @@
             loadInitialChat();
         }
 
-        // ================= KHO LƯU TRỮ & ĐIỀU PHỐI VIDEO NÂNG CẤP =================
+        // ================= KHO LƯU TRỮ VIDEO (ĐÃ SỬA LỖI NHÂN BẢN) =================
         async function addNewMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             let url = document.getElementById('movie-url').value.trim();
             if (!title || !url) return;
 
             let type = 'youtube';
-            
-            // Bộ lọc nhận biết loại link thông minh
-            if (url.includes('.mp4') || url.includes('.m3u8') || url.includes('storage') || url.includes('cdn')) {
-                type = 'direct_file'; // Luồng file trực tiếp (Tốc độ cao)
+            if (url.includes('.mp4') || url.includes('.m3u8') || url.includes('storage') || url.includes('cdn') || url.includes('catbox.moe') || url.includes('discordapp')) {
+                type = 'direct_file';
             } else if (url.includes('tiktok.com')) {
                 type = 'tiktok';
                 if (url.includes('vt.tiktok.com')) {
@@ -245,7 +243,7 @@
             }
 
             const { error } = await _supabase.from('movies').insert([{ title: title, url: url, type: type, added_by: currentUser }]);
-            if (error) { alert("Lỗi thêm: " + error.message); }
+            if (error) { alert("Lỗi thêm video: " + error.message); }
             
             document.getElementById('movie-title').value = '';
             document.getElementById('movie-url').value = '';
@@ -257,7 +255,17 @@
             const listContainer = document.getElementById('global-movie-list');
             if (data && listContainer) {
                 listContainer.innerHTML = '';
-                data.forEach(m => {
+                // Lọc bỏ trùng lặp tiêu đề trên giao diện hiển thị danh sách kho lưu trữ
+                let uniqueMovies = [];
+                let seenTitles = new Set();
+                data.forEach(item => {
+                    if (!seenTitles.has(item.title + item.url)) {
+                        seenTitles.add(item.title + item.url);
+                        uniqueMovies.push(item);
+                    }
+                });
+
+                uniqueMovies.forEach(m => {
                     let tagColor = 'bg-teal-500/10 text-teal-400';
                     if (m.type === 'direct_file') tagColor = 'bg-amber-500/10 text-amber-400';
                     
@@ -272,16 +280,17 @@
             }
         }
 
+        // FIX TRIỆT ĐỂ LỖI NHÂN BẢN: Bấm phát phim chỉ kích hoạt luồng render chứ không insert thêm dòng mới nữa
         async function playThisMovie(id) {
             const { data } = await _supabase.from('movies').select('*').eq('id', id);
             if(data && data.length > 0) {
-                const targetMovie = data[0];
-                await _supabase.from('movies').insert([{ 
-                    title: targetMovie.title, 
-                    url: targetMovie.url, 
-                    type: targetMovie.type, 
-                    added_by: currentUser 
-                }]);
+                renderPlayer(data[0]);
+                // Phát lệnh Realtime cho các máy khác cùng nhận diện qua kênh channel phát phim chung
+                _supabase.channel('movie_control_room').send({
+                    type: 'broadcast',
+                    event: 'sync_play',
+                    payload: data[0]
+                });
             }
         }
 
@@ -297,9 +306,16 @@
             _supabase.from('movies').select('*').order('created_at', { ascending: false }).limit(1)
                 .then(({ data }) => { if(data && data.length > 0) renderPlayer(data[0]); });
 
+            // Lắng nghe lệnh phát đồng bộ từ Admin mà không bị nhân bản dòng dữ liệu
+            const controlChannel = _supabase.channel('movie_control_room');
+            controlChannel.on('broadcast', { event: 'sync_play' }, payload => {
+                if(payload && payload.payload) renderPlayer(payload.payload);
+            }).subscribe();
+
             _supabase.channel('movie_channel_global')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movies' }, payload => {
                     renderPlayer(payload.new);
+                    loadMovieList();
                 }).subscribe();
             
             _supabase.channel('movie_delete_channel')
@@ -314,9 +330,7 @@
             container.innerHTML = '';
             container.classList.remove('hidden');
 
-            // TRÌNH PHÁT CHO TỪNG LOẠI LINK
             if (movie.type === 'direct_file') {
-                // Sử dụng trình phát HTML5 cao cấp cho link file mp4 đã get trực tiếp
                 container.innerHTML = `<video src="${movie.url}" controls autoplay class="w-full h-full rounded-xl shadow-lg"></video>`;
             } else if (movie.type === 'youtube') {
                 let videoId = '';
@@ -333,15 +347,15 @@
             }
         }
 
-        // ================= SỬA LỖI ĐỒNG BỘ CHAT (FIX UNDEFINED TRIỆT ĐỂ) =================
+        // ================= FIX HOÀN TOÀN CHAT KHÔNG PHẢN HỒI =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
             
             if (currentChatTab === 'public') {
+                // Quét linh hoạt cấu trúc bảng tin nhắn
                 const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(100);
                 if (data) data.forEach(msg => {
-                    // Thuật toán quét tất cả các tên cột có thể có trong database của Kiên
                     let content = msg.msg || msg.message || msg.text || msg.noidung || '';
                     let sender = msg.user || msg.username || msg.sender || 'Ẩn danh';
                     appendMessage(sender, content, sender === currentUser);
@@ -387,7 +401,7 @@
         }
 
         function appendMessage(sender, msg, isMe, isImage = false) {
-            if(!msg) return; // Không hiển thị nếu tin nhắn trống rỗng
+            if(!msg) return; 
             const box = document.getElementById('chat-messages');
             const msgEl = document.createElement('div');
             msgEl.className = `p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 ml-auto font-medium shadow-md' : 'bg-slate-800 text-slate-100'}`;
@@ -407,12 +421,14 @@
             input.value = '';
 
             if (currentChatTab === 'public') {
-                // Tự động tối ưu đẩy dữ liệu vào đồng thời cả 2 cột phổ biến để triệt hạ hoàn toàn lỗi hệ thống
-                await _supabase.from('chats').insert([{ user: currentUser, msg: txt, message: txt }]);
+                // ĐỒNG BỘ: Đẩy dữ liệu vào tất cả các tên cột phổ biến để chắc chắn Supabase nhận diện đúng cột trong bảng chats của Kiên
+                const { error } = await _supabase.from('chats').insert([{ user: currentUser, username: currentUser, sender: currentUser, msg: txt, message: txt, text: txt, noidung: txt }]);
+                if(error) { console.log("Lỗi gửi chat công khai: ", error.message); }
             } else {
                 const target = document.getElementById('private-target').value.trim();
                 if (!target) { alert('Hãy điền tên người nhận vào ô Gửi tới!'); return; }
-                await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: txt, message: txt, is_image: false }]);
+                const { error } = await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: txt, message: txt, text: txt, noidung: txt, is_image: false }]);
+                if(error) { console.log("Lỗi gửi chat riêng tư: ", error.message); }
             }
         }
 
@@ -447,7 +463,7 @@
             }
             const imgUrl = prompt("Nhập link ảnh:");
             if (!imgUrl) return;
-            await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: imgUrl, is_image: true }]);
+            await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: imgUrl, message: imgUrl, is_image: true }]);
         }
 
         function showSharedImageOnCall(url) {
