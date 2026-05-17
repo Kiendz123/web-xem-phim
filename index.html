@@ -59,7 +59,7 @@
                 </div>
 
                 <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
-                    <h4 class="text-sm font-bold text-teal-300 mb-2 uppercase tracking-wide">🍿 KHO PHIM & NHẠC (Bấm vào tên để phát cho cả phòng):</h4>
+                    <h4 class="text-sm font-bold text-teal-300 mb-2 uppercase tracking-wide">🍿 KHO PHIM & NHẠC:</h4>
                     <div id="global-movie-list" class="max-h-44 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                         </div>
                 </div>
@@ -118,7 +118,6 @@
                         <button onclick="insertEmote('🥰')" class="hover:scale-125 transition">🥰</button>
                         <button onclick="insertEmote('😎')" class="hover:scale-125 transition">😎</button>
                         <button onclick="insertEmote('🔥')" class="hover:scale-125 transition">🔥</button>
-                        <button onclick="insertEmote('🎬')" class="hover:scale-125 transition">🎬</button>
                         <button onclick="insertEmote('❤️')" class="hover:scale-125 transition">❤️</button>
                     </div>
 
@@ -163,7 +162,6 @@
             if (!userVal || !passVal) { alert('Vui lòng điền đủ thông tin!'); return; }
 
             if (isLoginMode) {
-                // SỬA: Ép tìm đúng bảng "users" viết bằng tiếng Anh đồng bộ với database của Kiên
                 const { data, error } = await _supabase.from('users').select('*').eq('user', userVal).eq('pass', passVal);
                 if (error) { alert('Hệ thống lỗi: ' + error.message); } 
                 else if (data && data.length > 0) { loginSuccess(data[0]['user'], data[0]['role'] || 'user'); } 
@@ -225,7 +223,7 @@
             loadInitialChat();
         }
 
-        // ================= KHO LƯU TRỮ VIDEO (ĐÃ SỬA LỖI NHÂN BẢN) =================
+        // ================= XỬ LÝ VIDEO TRÁNH TRÙNG LẶP / NHÂN BẢN =================
         async function addNewMovieLink() {
             const title = document.getElementById('movie-title').value.trim();
             let url = document.getElementById('movie-url').value.trim();
@@ -255,7 +253,8 @@
             const listContainer = document.getElementById('global-movie-list');
             if (data && listContainer) {
                 listContainer.innerHTML = '';
-                // Lọc bỏ trùng lặp tiêu đề trên giao diện hiển thị danh sách kho lưu trữ
+                
+                // Lọc loại bỏ trùng lặp hiển thị trên giao diện danh sách
                 let uniqueMovies = [];
                 let seenTitles = new Set();
                 data.forEach(item => {
@@ -280,12 +279,11 @@
             }
         }
 
-        // FIX TRIỆT ĐỂ LỖI NHÂN BẢN: Bấm phát phim chỉ kích hoạt luồng render chứ không insert thêm dòng mới nữa
         async function playThisMovie(id) {
             const { data } = await _supabase.from('movies').select('*').eq('id', id);
             if(data && data.length > 0) {
                 renderPlayer(data[0]);
-                // Phát lệnh Realtime cho các máy khác cùng nhận diện qua kênh channel phát phim chung
+                // Phát tín hiệu Realtime Broadcast đồng bộ giữa các máy (không ghi thêm dữ liệu trùng vào DB)
                 _supabase.channel('movie_control_room').send({
                     type: 'broadcast',
                     event: 'sync_play',
@@ -306,7 +304,6 @@
             _supabase.from('movies').select('*').order('created_at', { ascending: false }).limit(1)
                 .then(({ data }) => { if(data && data.length > 0) renderPlayer(data[0]); });
 
-            // Lắng nghe lệnh phát đồng bộ từ Admin mà không bị nhân bản dòng dữ liệu
             const controlChannel = _supabase.channel('movie_control_room');
             controlChannel.on('broadcast', { event: 'sync_play' }, payload => {
                 if(payload && payload.payload) renderPlayer(payload.payload);
@@ -347,24 +344,24 @@
             }
         }
 
-        // ================= FIX HOÀN TOÀN CHAT KHÔNG PHẢN HỒI =================
+        // ================= KHU VỰC FIX CHAT (ĐỒNG BỘ THEO CỘT "USER" VÀ "TEXT") =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
             
             if (currentChatTab === 'public') {
-                // Quét linh hoạt cấu trúc bảng tin nhắn
-                const { data } = await _supabase.from('chats').select('*').order('created_at', { ascending: true }).limit(100);
+                // SỬA CHUẨN: Lấy dữ liệu theo đúng tên cột "user" và "text" từ bảng chats của Kiên
+                const { data } = await _supabase.from('chats').select('user, text, created_at').order('created_at', { ascending: true }).limit(100);
                 if (data) data.forEach(msg => {
-                    let content = msg.msg || msg.message || msg.text || msg.noidung || '';
-                    let sender = msg.user || msg.username || msg.sender || 'Ẩn danh';
+                    let content = msg.text || '';
+                    let sender = msg.user || 'Ẩn danh';
                     appendMessage(sender, content, sender === currentUser);
                 });
             } else {
                 const { data } = await _supabase.from('chats_private').select('*').or(`sender.eq.${currentUser},receiver.eq.${currentUser}`).order('created_at', { ascending: true });
                 if (data) data.forEach(msg => {
                     const label = msg.sender === currentUser ? `To: ${msg.receiver}` : `From: ${msg.sender}`;
-                    let content = msg.msg || msg.message || msg.text || msg.noidung || '';
+                    let content = msg.text || msg.msg || '';
                     appendMessage(label, content, msg.sender === currentUser, msg.is_image);
                 });
             }
@@ -376,8 +373,9 @@
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => {
                     if (currentChatTab === 'public') {
                         let info = payload.new;
-                        let content = info.msg || info.message || info.text || info.noidung || '';
-                        let sender = info.user || info.username || info.sender || 'Ẩn danh';
+                        // SỬA CHUẨN: Đồng bộ lắng nghe theo trường "text" khi có người khác bấm gửi tin nhắn
+                        let content = info.text || '';
+                        let sender = info.user || 'Ẩn danh';
                         appendMessage(sender, content, sender === currentUser);
                         document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                     }
@@ -387,7 +385,7 @@
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
                     if (info.sender === currentUser || info.receiver === currentUser) {
-                        let content = info.msg || info.message || info.text || info.noidung || '';
+                        let content = info.text || info.msg || '';
                         if (info.is_image && info.receiver === currentUser) {
                             showSharedImageOnCall(content);
                         }
@@ -421,18 +419,18 @@
             input.value = '';
 
             if (currentChatTab === 'public') {
-                // ĐỒNG BỘ: Đẩy dữ liệu vào tất cả các tên cột phổ biến để chắc chắn Supabase nhận diện đúng cột trong bảng chats của Kiên
-                const { error } = await _supabase.from('chats').insert([{ user: currentUser, username: currentUser, sender: currentUser, msg: txt, message: txt, text: txt, noidung: txt }]);
-                if(error) { console.log("Lỗi gửi chat công khai: ", error.message); }
+                // SỬA CHUẨN: Khớp lệnh insert chuẩn tên cột là "user" và "text" vào database của Kiên
+                const { error } = await _supabase.from('chats').insert([{ user: currentUser, text: txt }]);
+                if(error) { console.log("Lỗi gửi chat: ", error.message); }
             } else {
                 const target = document.getElementById('private-target').value.trim();
                 if (!target) { alert('Hãy điền tên người nhận vào ô Gửi tới!'); return; }
-                const { error } = await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: txt, message: txt, text: txt, noidung: txt, is_image: false }]);
+                const { error } = await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, text: txt, is_image: false }]);
                 if(error) { console.log("Lỗi gửi chat riêng tư: ", error.message); }
             }
         }
 
-        // ================= CALL VIDEO & TRUYỀN ẢNH =================
+        // ================= CAMERA & ĐƯỜNG TRUYỀN CALL =================
         async function toggleVideoCall() {
             const grid = document.getElementById('video-grid');
             const btn = document.getElementById('call-btn');
@@ -463,7 +461,7 @@
             }
             const imgUrl = prompt("Nhập link ảnh:");
             if (!imgUrl) return;
-            await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, msg: imgUrl, message: imgUrl, is_image: true }]);
+            await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, text: imgUrl, is_image: true }]);
         }
 
         function showSharedImageOnCall(url) {
