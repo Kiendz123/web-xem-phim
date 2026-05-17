@@ -16,8 +16,6 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <div id="hidden-voice-container" class="hidden w-0 h-0 absolute pointer-events-none opacity-0"></div>
-
     <div id="auth-container" class="flex flex-col items-center justify-center flex-1 px-4 py-12">
         <div class="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800">
             <h2 id="auth-title" class="text-3xl font-extrabold mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">Cinema Net</h2>
@@ -97,12 +95,17 @@
                         <button onclick="endCurrentCall()" id="hangup-btn" class="hidden w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-1.5 rounded-lg text-xs transition shadow-md shadow-rose-500/20">🔴 Kết Thúc Cuộc Gọi (Cúp Máy)</button>
                     </div>
 
+                    <div id="audio-status-bar" class="hidden mb-2 text-center p-1.5 rounded-lg text-xs font-bold bg-slate-950 border border-slate-800 text-slate-400">
+                        <span id="audio-indicator-text">🎙️ Hệ thống âm thanh: Đang tắt</span>
+                    </div>
+
                     <div id="video-grid" class="grid grid-cols-2 gap-2 hidden">
                         <div class="bg-slate-950 aspect-video rounded-xl overflow-hidden relative border border-slate-800">
                             <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
                             <span class="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-[9px] px-2 py-0.5 rounded-md text-slate-300">Bạn</span>
                         </div>
                         <div class="bg-slate-950 aspect-video rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
+                            <audio id="remote-audio" autoplay></audio>
                             <video id="remote-video" autoplay playsinline class="w-full h-full object-cover hidden"></video>
                             <div id="remote-image-display" class="w-full h-full hidden bg-slate-900 flex items-center justify-center p-1">
                                 <img id="call-shared-img" class="max-w-full max-h-full object-contain rounded-lg shadow-md" src="">
@@ -165,10 +168,18 @@
         let currentRole = 'user';
         let currentChatTab = 'public'; 
         let selectedPrivateUser = '';
+        
+        // WebRTC variables
         let localStream = null;
+        let peerConnection = null;
+        let audioContext = null;
+        let audioAnalyser = null;
+        let audioInterval = null;
         
         let currentActiveCallPartner = '';
         let incomingCallerName = '';
+
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         window.onload = function() {
             const savedUser = localStorage.getItem('cinema_user');
@@ -399,7 +410,7 @@
             }
         }
 
-        // ================= XỬ LÝ CHAT DỮ LIỆU & REALTIME BIẾN MẤT KHI DỌN DEP =================
+        // ================= XỬ LÝ CHAT DỮ LIỆU =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -515,7 +526,7 @@
             }
         }
 
-        // ================= ĐIỀU PHỐI ĐƯỜNG TRUYỀN CALL & ĐỒNG BỘ TIẾNG GỌI NGẦM =================
+        // ================= HỆ THỐNG WEBRTC NÂNG CẤP + THANH ĐÈN KIỂM TRA ÂM THANH REALTIME =================
         function listenToRealtimeSignals() {
             _supabase.channel('cinema_call_signal_room').on('broadcast', { event: 'call_invite' }, payload => {
                 const signal = payload.payload;
@@ -524,7 +535,7 @@
                     document.getElementById('incoming-call-text').innerText = `🔔 [${signal.sender}] đang gọi Video cho bạn...`;
                     document.getElementById('incoming-call-box').classList.remove('hidden');
                 }
-            }).on('broadcast', { event: 'call_response' }, payload => {
+            }).on('broadcast', { event: 'call_response' }, async payload => {
                 const answer = payload.payload;
                 if (answer.receiver === currentUser) {
                     if (answer.status === 'accepted') {
@@ -532,9 +543,16 @@
                         document.getElementById('remote-video').classList.remove('hidden');
                         document.getElementById('hangup-btn').classList.remove('hidden'); 
                         
-                        // Kích hoạt đường truyền tiếng ngầm của bên gọi điện
-                        startHiddenVoiceBridge(answer.roomName);
-
+                        // Khởi tạo đầu nối WebRTC Peer
+                        setupPeerConnection();
+                        const offer = await peerConnection.createOffer();
+                        await peerConnection.setLocalDescription(offer);
+                        
+                        _supabase.channel('cinema_call_signal_room').send({
+                            type: 'broadcast',
+                            event: 'webrtc_offer',
+                            payload: { sdp: offer, sender: currentUser, receiver: currentActiveCallPartner }
+                        });
                     } else if (answer.status === 'rejected') {
                         alert(`❌ Cuộc gọi bị từ chối bởi ${answer.sender}`);
                         resetCallInterface();
@@ -543,7 +561,90 @@
                         resetCallInterface();
                     }
                 }
+            }).on('broadcast', async payload => {
+                // Xử lý luồng dữ liệu cấu hình WebRTC SDP trực tiếp qua mạng p2p
+                if (payload.event === 'webrtc_offer' && payload.payload.receiver === currentUser) {
+                    setupPeerConnection();
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
+                    const ans = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(ans);
+                    
+                    _supabase.channel('cinema_call_signal_room').send({
+                        type: 'broadcast',
+                        event: 'webrtc_answer',
+                        payload: { sdp: ans, sender: currentUser, receiver: payload.payload.sender }
+                    });
+                }
+                if (payload.event === 'webrtc_answer' && payload.payload.receiver === currentUser) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
+                }
+                if (payload.event === 'ice_candidate' && payload.payload.receiver === currentUser) {
+                    if (peerConnection && payload.payload.candidate) {
+                        try { await peerConnection.addIceCandidate(new RTCIceCandidate(payload.payload.candidate)); } catch(e){}
+                    }
+                }
             }).subscribe();
+        }
+
+        function setupPeerConnection() {
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            peerConnection.ontrack = event => {
+                const remoteAudio = document.getElementById('remote-audio');
+                if (remoteAudio && event.streams[0]) {
+                    remoteAudio.srcObject = event.streams[0];
+                }
+            };
+
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    _supabase.channel('cinema_call_signal_room').send({
+                        type: 'broadcast',
+                        event: 'ice_candidate',
+                        payload: { candidate: event.candidate, receiver: currentActiveCallPartner }
+                    });
+                }
+            };
+        }
+
+        // HÀM KIỂM TRA SOUND VOLUME CỦA MICRO ĐỂ BÁO ĐÈN TRẠNG THÁI TRUYỀN TIẾNG
+        function startAudioMonitoring(stream) {
+            try {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(stream);
+                audioAnalyser = audioContext.createAnalyser();
+                audioAnalyser.fftSize = 256;
+                source.connect(audioAnalyser);
+                
+                const bufferLength = audioAnalyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                const bar = document.getElementById('audio-status-bar');
+                const txt = document.getElementById('audio-indicator-text');
+                bar.classList.remove('hidden');
+
+                audioInterval = setInterval(() => {
+                    audioAnalyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
+                    let average = sum / bufferLength;
+
+                    if (average > 5) { // Có phát hiện sóng âm thanh truyền đi
+                        bar.className = "mb-2 text-center p-1.5 rounded-lg text-xs font-bold bg-emerald-950 border border-emerald-500/40 text-emerald-400 transition-all duration-150 animate-pulse";
+                        txt.innerText = "🎤 ĐANG TRUYỀN TIẾNG PHÁT RA... (MICRO HOẠT ĐỘNG)";
+                    } else { // Trạng thái im lặng
+                        bar.className = "mb-2 text-center p-1.5 rounded-lg text-xs font-bold bg-slate-950 border border-slate-800 text-slate-400 transition-all duration-150";
+                        txt.innerText = "🔇 Micro đang bật nhưng chưa có tiếng nói...";
+                    }
+                }, 300);
+            } catch (e) {
+                console.log("Không thể chạy bộ đo âm lượng:", e);
+            }
         }
 
         async function startCallToTarget() {
@@ -561,6 +662,9 @@
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('local-video').srcObject = localStream;
                 
+                // Kích hoạt bộ kiểm tra truyền tiếng ngay lập tức
+                startAudioMonitoring(localStream);
+
                 _supabase.channel('cinema_call_signal_room').send({
                     type: 'broadcast',
                     event: 'call_invite',
@@ -582,24 +686,19 @@
             document.getElementById('call-img-btn').classList.remove('hidden');
             document.getElementById('hangup-btn').classList.remove('hidden'); 
 
-            // Tạo tên phòng voice chat chung duy nhất dựa trên tên 2 người
-            const roomName = `CinemaNet_Voice_${[currentUser, incomingCallerName].sort().join('_')}`;
-
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('local-video').srcObject = localStream;
                 document.getElementById('remote-video').classList.remove('hidden');
 
-                // Báo lại cho bên gọi biết là đã chấp nhận + truyền kèm tên phòng voice chat
+                // Kích hoạt bộ kiểm tra truyền tiếng ngay lập tức
+                startAudioMonitoring(localStream);
+
                 _supabase.channel('cinema_call_signal_room').send({
                     type: 'broadcast',
                     event: 'call_response',
-                    payload: { sender: currentUser, receiver: incomingCallerName, status: 'accepted', roomName: roomName }
+                    payload: { sender: currentUser, receiver: incomingCallerName, status: 'accepted' }
                 });
-
-                // Kích hoạt đường truyền tiếng ngầm của bên nhận cuộc gọi
-                startHiddenVoiceBridge(roomName);
-
             } catch (err) {
                 alert('Không thể kết nối camera phản hồi: ' + err.message);
                 resetCallInterface();
@@ -613,13 +712,6 @@
                 event: 'call_response',
                 payload: { sender: currentUser, receiver: incomingCallerName, status: 'rejected' }
             });
-        }
-
-        // KÍCH HOẠT ĐƯỜNG TRUYỀN ÂM THANH NGẦM QUA JITSI
-        function startHiddenVoiceBridge(roomName) {
-            const voiceContainer = document.getElementById('hidden-voice-container');
-            // Cấu hình Jitsi chạy ở chế độ chỉ bật audio, ẩn hết thanh công cụ điều khiển
-            voiceContainer.innerHTML = `<iframe src="https://meet.jit.si/${roomName}#config.startWithVideoMuted=true&config.startWithAudioMuted=false&config.prejoinPageEnabled=false&interfaceConfig.TOOLBAR_BUTTONS=[]" allow="microphone; audio"></iframe>`;
         }
 
         function endCurrentCall() {
@@ -636,15 +728,20 @@
         }
 
         function resetCallInterface() {
+            if (audioInterval) clearInterval(audioInterval);
+            if (audioContext) { try { audioContext.close(); } catch(e){} }
+            
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
             }
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
             currentActiveCallPartner = '';
             
-            // Xóa bỏ phòng gọi ngầm để ngắt kết nối âm thanh ngay lập tức
-            document.getElementById('hidden-voice-container').innerHTML = '';
-
+            document.getElementById('audio-status-bar').classList.add('hidden');
             document.getElementById('video-grid').classList.add('hidden');
             document.getElementById('call-img-btn').classList.add('hidden');
             document.getElementById('hangup-btn').classList.add('hidden');
