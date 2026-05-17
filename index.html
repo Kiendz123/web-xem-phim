@@ -60,8 +60,7 @@
 
                 <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
                     <h4 class="text-sm font-bold text-teal-300 mb-2 uppercase tracking-wide">🍿 KHO PHIM & NHẠC:</h4>
-                    <div id="global-movie-list" class="max-h-44 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                        </div>
+                    <div id="global-movie-list" class="max-h-44 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
                 </div>
 
                 <div class="flex-1 bg-slate-950 rounded-2xl overflow-hidden aspect-video relative border border-slate-800 shadow-2xl">
@@ -105,9 +104,12 @@
                 </div>
 
                 <div class="flex-1 flex flex-col overflow-hidden bg-slate-950/40">
-                    <div id="private-selector-box" class="hidden p-2 bg-slate-900/60 border-b border-slate-800 flex gap-2 items-center text-xs">
-                        <span class="text-slate-400 font-medium whitespace-nowrap">Gửi tới:</span>
-                        <input type="text" id="private-target" placeholder="Tên tài khoản nhận..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-teal-500">
+                    
+                    <div id="private-selector-box" class="hidden p-3 bg-slate-900/80 border-b border-slate-800/80 flex flex-col gap-1.5 text-xs">
+                        <span class="text-teal-400 font-bold uppercase tracking-wider text-[10px]">👥 Chọn thành viên muốn nhắn tin riêng:</span>
+                        <select id="private-target-select" onchange="selectPrivateUser()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-teal-500">
+                            <option value="">-- Bấm vào đây để chọn người nhận --</option>
+                        </select>
                     </div>
 
                     <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3.5 text-sm"></div>
@@ -140,6 +142,7 @@
         let currentUser = null;
         let currentRole = 'user';
         let currentChatTab = 'public'; 
+        let selectedPrivateUser = '';
         let localStream = null;
 
         window.onload = function() {
@@ -189,6 +192,7 @@
             }
 
             loadMovieList();
+            loadUsersToSelect(); // Nạp danh sách thành viên tự động
             listenToMovieUpdates();
             listenToChatMessages();
             loadInitialChat();
@@ -205,6 +209,25 @@
             input.focus();
         }
 
+        // TỰ ĐỘNG TÌM USER TRONG DATABASE ĐỂ HIỂN THỊ THÀNH DANH SÁCH THÀNH VIÊN CHAT
+        async function loadUsersToSelect() {
+            const { data } = await _supabase.from('users').select('user');
+            const selectEl = document.getElementById('private-target-select');
+            if (data && selectEl) {
+                selectEl.innerHTML = '<option value="">-- Bấm vào đây để chọn người nhận --</option>';
+                data.forEach(item => {
+                    if (item.user !== currentUser) {
+                        selectEl.innerHTML += `<option value="${item.user}">💬 Nhắn tin cho: ${item.user}</option>`;
+                    }
+                });
+            }
+        }
+
+        function selectPrivateUser() {
+            selectedPrivateUser = document.getElementById('private-target-select').value;
+            loadInitialChat();
+        }
+
         function switchChatTab(tab) {
             currentChatTab = tab;
             const tPub = document.getElementById('tab-public');
@@ -219,6 +242,7 @@
                 tPriv.className = "flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/20";
                 tPub.className = "flex-1 py-3 text-slate-400 hover:text-slate-200 transition";
                 selector.classList.remove('hidden');
+                loadUsersToSelect(); // Làm mới danh sách user khi bấm qua tab riêng tư
             }
             loadInitialChat();
         }
@@ -253,8 +277,6 @@
             const listContainer = document.getElementById('global-movie-list');
             if (data && listContainer) {
                 listContainer.innerHTML = '';
-                
-                // Lọc loại bỏ trùng lặp hiển thị trên giao diện danh sách
                 let uniqueMovies = [];
                 let seenTitles = new Set();
                 data.forEach(item => {
@@ -283,7 +305,6 @@
             const { data } = await _supabase.from('movies').select('*').eq('id', id);
             if(data && data.length > 0) {
                 renderPlayer(data[0]);
-                // Phát tín hiệu Realtime Broadcast đồng bộ giữa các máy (không ghi thêm dữ liệu trùng vào DB)
                 _supabase.channel('movie_control_room').send({
                     type: 'broadcast',
                     event: 'sync_play',
@@ -344,13 +365,12 @@
             }
         }
 
-        // ================= KHU VỰC FIX CHAT (ĐỒNG BỘ THEO CỘT "USER" VÀ "TEXT") =================
+        // ================= FIX CHAT RIÊNG HOÀN TOÀN (ĐỒNG BỘ CỘT "MSG") =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
             
             if (currentChatTab === 'public') {
-                // SỬA CHUẨN: Lấy dữ liệu theo đúng tên cột "user" và "text" từ bảng chats của Kiên
                 const { data } = await _supabase.from('chats').select('user, text, created_at').order('created_at', { ascending: true }).limit(100);
                 if (data) data.forEach(msg => {
                     let content = msg.text || '';
@@ -358,10 +378,20 @@
                     appendMessage(sender, content, sender === currentUser);
                 });
             } else {
-                const { data } = await _supabase.from('chats_private').select('*').or(`sender.eq.${currentUser},receiver.eq.${currentUser}`).order('created_at', { ascending: true });
+                if (!selectedPrivateUser) {
+                    box.innerHTML = `<div class="text-center text-xs text-slate-500 py-8">Vui lòng chọn một thành viên trong danh sách phía trên để bắt đầu nhắn tin riêng tư...</div>`;
+                    return;
+                }
+                // Lọc cuộc hội thoại 2 chiều giữa currentUser và selectedPrivateUser
+                const { data } = await _supabase.from('chats_private')
+                    .select('*')
+                    .or(`and(sender.eq.${currentUser},receiver.eq.${selectedPrivateUser}),and(sender.eq.${selectedPrivateUser},receiver.eq.${currentUser})`)
+                    .order('created_at', { ascending: true });
+                
                 if (data) data.forEach(msg => {
-                    const label = msg.sender === currentUser ? `To: ${msg.receiver}` : `From: ${msg.sender}`;
-                    let content = msg.text || msg.msg || '';
+                    const label = msg.sender === currentUser ? `Bạn` : msg.sender;
+                    // FIX CHUẨN: Đọc nội dung từ trường "msg" của bảng chats_private
+                    let content = msg.msg || ''; 
                     appendMessage(label, content, msg.sender === currentUser, msg.is_image);
                 });
             }
@@ -373,7 +403,6 @@
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => {
                     if (currentChatTab === 'public') {
                         let info = payload.new;
-                        // SỬA CHUẨN: Đồng bộ lắng nghe theo trường "text" khi có người khác bấm gửi tin nhắn
                         let content = info.text || '';
                         let sender = info.user || 'Ẩn danh';
                         appendMessage(sender, content, sender === currentUser);
@@ -384,13 +413,18 @@
             _supabase.channel('private_chat_system')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
-                    if (info.sender === currentUser || info.receiver === currentUser) {
-                        let content = info.text || info.msg || '';
+                    // Kiểm tra xem tin nhắn riêng mới đẩy lên có thuộc về cuộc hội thoại đang mở hay không
+                    const matchCurrentRoom = (info.sender === currentUser && info.receiver === selectedPrivateUser) || 
+                                             (info.sender === selectedPrivateUser && info.receiver === currentUser);
+                    
+                    if (matchCurrentRoom) {
+                        // FIX CHUẨN: Lắng nghe realtime từ cột dữ liệu "msg" của Kiên
+                        let content = info.msg || '';
                         if (info.is_image && info.receiver === currentUser) {
                             showSharedImageOnCall(content);
                         }
                         if (currentChatTab === 'private') {
-                            const label = info.sender === currentUser ? `To: ${info.receiver}` : `From: ${info.sender}`;
+                            const label = info.sender === currentUser ? `Bạn` : info.sender;
                             appendMessage(label, content, info.sender === currentUser, info.is_image);
                             document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
                         }
@@ -419,13 +453,12 @@
             input.value = '';
 
             if (currentChatTab === 'public') {
-                // SỬA CHUẨN: Khớp lệnh insert chuẩn tên cột là "user" và "text" vào database của Kiên
                 const { error } = await _supabase.from('chats').insert([{ user: currentUser, text: txt }]);
                 if(error) { console.log("Lỗi gửi chat: ", error.message); }
             } else {
-                const target = document.getElementById('private-target').value.trim();
-                if (!target) { alert('Hãy điền tên người nhận vào ô Gửi tới!'); return; }
-                const { error } = await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, text: txt, is_image: false }]);
+                if (!selectedPrivateUser) { alert('Vui lòng chọn một thành viên trong danh sách để gửi tin!'); return; }
+                // FIX CHUẨN: Đẩy nội dung tin nhắn riêng vào đúng tên cột là "msg" của bảng chats_private
+                const { error } = await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: selectedPrivateUser, msg: txt, is_image: false }]);
                 if(error) { console.log("Lỗi gửi chat riêng tư: ", error.message); }
             }
         }
@@ -454,14 +487,13 @@
         }
 
         async function triggerCallImageSend() {
-            const target = document.getElementById('private-target').value.trim();
-            if (currentChatTab !== 'private' || !target) {
-                alert('Vui lòng chọn tab Hộp thư riêng tư và điền tên người nhận trước!');
+            if (currentChatTab !== 'private' || !selectedPrivateUser) {
+                alert('Vui lòng chọn một người nhận trong danh sách chat riêng tư trước!');
                 return;
             }
             const imgUrl = prompt("Nhập link ảnh:");
             if (!imgUrl) return;
-            await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: target, text: imgUrl, is_image: true }]);
+            await _supabase.from('chats_private').insert([{ sender: currentUser, receiver: selectedPrivateUser, msg: imgUrl, is_image: true }]);
         }
 
         function showSharedImageOnCall(url) {
