@@ -15,9 +15,13 @@
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
         .neon-glow { box-shadow: 0 0 20px rgba(20, 184, 166, 0.15); }
         .neon-btn { box-shadow: 0 4px 14px 0 rgba(20, 184, 166, 0.3); }
+        .toast-notify { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
-<body class="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-gray-950 to-black">
+<body class="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-gray-950 to-black relative">
+
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full px-4 sm:px-0"></div>
 
     <div id="auth-container" class="flex flex-col items-center justify-center flex-1 px-4 py-12">
         <div class="bg-slate-900/40 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-800/80 neon-glow">
@@ -102,7 +106,7 @@
                             <select id="call-target-select" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500">
                                 <option value="">-- Chọn bạn bè để liên lạc --</option>
                             </select>
-                            <button onclick="startCallToTarget()" id="call-btn" class="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black px-3.5 py-2 rounded-lg text-xs transition transform active:scale-95">📞 Gọi</button>
+                            <button onclick="startCallToTarget()" id="call-btn" class="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-emerald-600 text-slate-950 font-black px-3.5 py-2 rounded-lg text-xs transition transform active:scale-95">📞 Gọi</button>
                         </div>
                         <button onclick="endCurrentCall()" id="hangup-btn" class="hidden w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-2 rounded-lg text-xs transition">🔴 Kết Thúc Cuộc Gọi (Cúp Máy)</button>
                     </div>
@@ -133,9 +137,12 @@
                     </div>
                 </div>
 
-                <div class="flex border-b border-slate-850 bg-slate-950/40 text-xs font-black text-center">
+                <div class="flex border-b border-slate-850 bg-slate-950/40 text-xs font-black text-center relative">
                     <button onclick="switchChatTab('public')" id="tab-public" class="flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/10">💬 Phòng Nhóm</button>
-                    <button onclick="switchChatTab('private')" id="tab-private" class="flex-1 py-3 text-slate-500 hover:text-slate-300 transition">🔒 Hộp Thư Riêng Tư</button>
+                    <button onclick="switchChatTab('private')" id="tab-private" class="flex-1 py-3 text-slate-500 hover:text-slate-300 transition relative flex items-center justify-center gap-1">
+                        🔒 Hộp Thư Riêng Tư
+                        <span id="private-badge" class="hidden bg-rose-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse border border-slate-950 uppercase tracking-tighter">● Tin mới</span>
+                    </button>
                 </div>
 
                 <div class="flex-1 flex flex-col overflow-hidden bg-slate-950/20">
@@ -160,7 +167,7 @@
                     
                     <div class="p-3 border-t border-slate-900 bg-slate-950/40 flex gap-2">
                         <input type="text" id="chat-input" onkeypress="if(event.key === 'Enter') sendChatMessage()" placeholder="Nhập nội dung nhắn tin..." class="flex-1 bg-slate-950 border border-slate-800/80 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-teal-500">
-                        <button onclick="sendChatMessage()" class="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs transition tracking-wide transform active:scale-95">Gửi</button>
+                        <button onclick="sendChatMessage()" class="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs transition tracking-wide transform active:scale-[0.95]">Gửi</button>
                     </div>
                 </div>
             </div>
@@ -291,12 +298,15 @@
 
             if (tab === 'public') {
                 tPub.className = "flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/10";
-                tPriv.className = "flex-1 py-3 text-slate-500 hover:text-slate-300 transition";
+                tPriv.className = "flex-1 py-3 text-slate-500 hover:text-slate-300 transition relative flex items-center justify-center gap-1";
                 selector.classList.add('hidden');
             } else {
-                tPriv.className = "flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/10";
+                tPriv.className = "flex-1 py-3 text-teal-400 border-b-2 border-teal-400 transition bg-slate-900/10 relative flex items-center justify-center gap-1";
                 tPub.className = "flex-1 py-3 text-slate-500 hover:text-slate-300 transition";
                 selector.classList.remove('hidden');
+                
+                // Khi bấm vào tab riêng tư, ẩn chấm đỏ thông báo tổng đi
+                document.getElementById('private-badge').classList.add('hidden');
                 loadUsersToSelect(); 
             }
             loadInitialChat();
@@ -419,7 +429,7 @@
             }
         }
 
-        // ================= XỬ LÝ CHAT DỮ LIỆU & ICON PHÂN TÁCH NHÓM =================
+        // ================= XỬ LÝ CHAT DỮ LIỆU & ĐÃ THÊM DÒNG THÔNG BÁO TIN MỚI NÂNG CAO =================
         async function loadInitialChat() {
             const box = document.getElementById('chat-messages');
             box.innerHTML = '';
@@ -458,17 +468,43 @@
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats_private' }, payload => {
                     const info = payload.new;
                     
-                    // CHỈ BẮT TIN NHẮN TỪ ĐỐI PHƯƠNG TRUYỀN ĐẾN ĐỂ TRÁNH TRÙNG LẶP DO ĐÃ CÓ LOCAL RENDER
-                    const isIncomingFromPartner = (info.sender === selectedPrivateUser && info.receiver === currentUser);
-                    
-                    if (isIncomingFromPartner) {
-                        if (info.is_image) { showSharedImageOnCall(info.msg); }
-                        if (currentChatTab === 'private') {
+                    // KIỂM TRA TIN NHẮN RIÊNG ĐƯỢC GỬI ĐẾN TÀI KHOẢN CỦA MÌNH
+                    if (info.receiver === currentUser) {
+                        
+                        // Nếu đang ở phòng chat với đúng người đó, vẽ tin nhắn lên ngay
+                        if (info.sender === selectedPrivateUser && currentChatTab === 'private') {
+                            if (info.is_image) { showSharedImageOnCall(info.msg); }
                             appendMessage(info.sender, info.msg || '', false, info.is_image);
                             document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+                        } else {
+                            // CẢI TIẾN: NẾU ĐANG XEM PHIM HOẶC CHAT PHÒNG CHUNG, BẬT CHẤM ĐỎ VÀ HIỆN DÒNG THÔNG BÁO TOAST
+                            document.getElementById('private-badge').classList.remove('hidden');
+                            showNotificationToast(info.sender, info.is_image ? "Đã gửi 1 hình ảnh..." : info.msg);
                         }
                     }
                 }).subscribe();
+        }
+
+        // Hàm tạo dòng thông báo nổi (Toast Notification) biến mất sau 4 giây
+        function showNotificationToast(sender, content) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = "toast-notify bg-slate-900/95 backdrop-blur-md border border-teal-500/40 p-3.5 rounded-xl shadow-2xl flex flex-col gap-1 text-xs text-slate-200 neon-glow";
+            toast.innerHTML = `
+                <div class="flex items-center justify-between border-b border-slate-800/60 pb-1.5 mb-1">
+                    <span class="font-black text-teal-400 uppercase tracking-wider text-[10px]">📩 Tin nhắn riêng mới</span>
+                    <span class="text-[9px] text-slate-500 font-bold">Vừa xong</span>
+                </div>
+                <p class="font-bold text-slate-100">👑 ${sender}:</p>
+                <p class="text-slate-400 truncate mt-0.5">${content}</p>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                toast.style.transition = 'all 0.3s ease-in';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
 
         function appendMessage(sender, msg, isMe, isImage = false) {
@@ -476,7 +512,6 @@
             const box = document.getElementById('chat-messages');
             const msgEl = document.createElement('div');
             
-            // XỬ LÝ ICON RE-RENDER THEO NHÓM VAI TRÒ
             let groupIcon = '👤 MEMBER';
             let groupColor = 'text-teal-400';
             if (sender === 'Kienpro888' || sender === '👑 ADMIN') {
@@ -498,7 +533,6 @@
             box.appendChild(msgEl);
         }
 
-        // ĐÃ ĐƯỢC TỐI ƯU SỬA LỖI LAG PHÒNG CHAT RIÊNG (LOCAL RENDER KHÔNG CẦN F5)
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
             const txt = input.value.trim();
@@ -510,7 +544,6 @@
             } else {
                 if (!selectedPrivateUser) return;
                 
-                // 1. Đẩy đồng bộ lên Database Supabase ngầm
                 const { error } = await _supabase.from('chats_private').insert([
                     { sender: currentUser, receiver: selectedPrivateUser, msg: txt, is_image: false }
                 ]);
@@ -520,10 +553,7 @@
                     return;
                 }
                 
-                // 2. Local Render: Tự động in luôn dòng chữ của mình ra giao diện để triệt tiêu độ trễ mạng
                 appendMessage('Bạn', txt, true, false);
-                
-                // 3. Cuộn mượt màn hình chat xuống dưới cùng
                 const chatBox = document.getElementById('chat-messages');
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
