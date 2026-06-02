@@ -171,21 +171,20 @@
         statusDiv.style.color = 'orange';
         statusDiv.innerText = "⏳ Đang đồng bộ điểm số lên hệ thống...";
 
-        // Đổi tên các trường dữ liệu không chứa dấu để tăng khả năng tương thích di động toàn diện
-        const data = {
-            "Giam_Khao": savedUsername,
-            "Bai_Hat": savedSongName,
-            "Nguon_Phat": currentSource,
-            "Chi_Tiet_Nguon": savedSourceVal,
-            "Diem_So": finalScore,
-            "Thoi_Gian": new Date().toLocaleString('vi-VN')
-        };
+        // Chuyển hoàn toàn sang cấu trúc FormData nguyên bản chống lỗi ISO-8859-1 triệt để
+        const formData = new FormData();
+        formData.append("Giam_Khao", savedUsername);
+        formData.append("Bai_Hat", savedSongName);
+        formData.append("Nguon_Phat", currentSource);
+        formData.append("Chi_Tiet_Nguon", savedSourceVal);
+        formData.append("Diem_So", finalScore);
+        formData.append("Thoi_Gian", new Date().toLocaleString('vi-VN'));
 
         try {
-            // Loại bỏ hoàn toàn cấu hình headers thủ công để trình duyệt tự động ép gói dạng FormData/JSON tương thích tiếng Việt
             await fetch(FORMSPREE_API_URL, {
                 method: 'POST',
-                body: JSON.stringify(data)
+                body: formData,
+                headers: { 'Accept': 'application/json' }
             });
             statusDiv.style.color = '#00e676';
             statusDiv.innerHTML = "🚀 Đã lưu điểm thành công!";
