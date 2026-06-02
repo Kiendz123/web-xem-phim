@@ -171,6 +171,7 @@
         statusDiv.style.color = 'orange';
         statusDiv.innerText = "⏳ Đang đồng bộ điểm số lên hệ thống...";
 
+        // Đổi tên các trường dữ liệu không chứa dấu để tăng khả năng tương thích di động toàn diện
         const data = {
             "Giam_Khao": savedUsername,
             "Bai_Hat": savedSongName,
@@ -181,13 +182,9 @@
         };
 
         try {
-            // Sử dụng cấu hình chuẩn hóa Header chống lỗi kí tự tiếng Việt nâng cao
+            // Loại bỏ hoàn toàn cấu hình headers thủ công để trình duyệt tự động ép gói dạng FormData/JSON tương thích tiếng Việt
             await fetch(FORMSPREE_API_URL, {
                 method: 'POST',
-                headers: { 
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json; charset=UTF-8' 
-                },
                 body: JSON.stringify(data)
             });
             statusDiv.style.color = '#00e676';
