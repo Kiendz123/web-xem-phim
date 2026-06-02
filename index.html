@@ -59,14 +59,8 @@
 
 <div class="container">
     <h1>🎵 AI Music Realtime Rating</h1>
-    <form id="proRatingForm" action="https://formspree.io/f/maqkrqgy" method="POST">
-        <input type="hidden" name="Giám khảo" id="hidden_username">
-        <input type="hidden" name="Bài hát" id="hidden_songname">
-        <input type="hidden" name="Nguồn phát" id="hidden_source">
-        <input type="hidden" name="Chi tiết nguồn" id="hidden_detail">
-        <input type="hidden" name="Điểm số" id="hidden_score">
-        <input type="hidden" name="Thời gian" id="hidden_time">
-
+    
+    <form id="proRatingForm">
         <div class="form-group"><label>Giám khảo:</label><input type="text" id="username" required placeholder="Nhập tên của bạn..."></div>
         <div class="form-group"><label>Tên bài hát / Nghệ sĩ:</label><input type="text" id="songName" required placeholder="Ví dụ: Lạc Trôi - Sơn Tùng"></div>
         <div class="form-group">
@@ -106,6 +100,15 @@
         <p id="verdict" style="font-style:italic;"></p>
     </div>
     <div id="status"></div>
+
+    <form id="hiddenCloudForm" action="https://formspree.io/f/maqkrqgy" method="POST" style="display:none;">
+        <input type="text" name="Giam_Khao" id="cloud_user">
+        <input type="text" name="Bai_Hat" id="cloud_song">
+        <input type="text" name="Nguon_Phat" id="cloud_source">
+        <input type="text" name="Chi_Tiet" id="cloud_detail">
+        <input type="text" name="Diem" id="cloud_score">
+        <input type="text" name="Thoi_Gian" id="cloud_time">
+    </form>
 </div>
 
 <script>
@@ -136,7 +139,6 @@
     }
 
     form.addEventListener('submit', function(e) {
-        // CHỈ chặn gửi form lần đầu để thực hiện hiệu ứng phát nhạc và tính điểm ngẫu nhiên
         e.preventDefault();
         savedUsername = document.getElementById('username').value.trim();
         savedSongName = document.getElementById('songName').value.trim();
@@ -168,23 +170,23 @@
         document.getElementById('comment1').innerText = avg >= 7.0 ? "Bản phối rất bắt tai và có điểm nhấn tốt!" : "Giai điệu cần cải thiện thêm.";
         document.getElementById('judge1').style.display = 'block';
         
-        // Gán dữ liệu vào các thẻ input ẩn
-        document.getElementById('hidden_username').value = savedUsername;
-        document.getElementById('hidden_songname').value = savedSongName;
-        document.getElementById('hidden_source').value = currentSource;
-        document.getElementById('hidden_detail').value = savedSourceVal;
-        document.getElementById('hidden_score').value = avg;
-        document.getElementById('hidden_time').value = new Date().toLocaleString('vi-VN');
+        // Đổ dữ liệu chữ vào Form ẩn biệt lập hoàn toàn
+        document.getElementById('cloud_user').value = savedUsername;
+        document.getElementById('cloud_song').value = savedSongName;
+        document.getElementById('cloud_source').value = currentSource;
+        document.getElementById('cloud_detail').value = savedSourceVal;
+        document.getElementById('cloud_score').value = avg;
+        document.getElementById('cloud_time').value = new Date().toLocaleString('vi-VN');
 
         document.getElementById('finalScore').innerText = avg;
         resultBox.style.display = 'block';
         statusDiv.style.color = '#00e676';
-        statusDiv.innerText = "⏳ Đang chuyển hướng đồng bộ an toàn...";
+        statusDiv.innerText = "🚀 Đang tiến hành lưu điểm lên Cloud...";
 
-        // Kích hoạt nộp form chuẩn HTML (Không qua lệnh fetch JS nên MIỄN NHIỄM HOÀN TOÀN với lỗi ISO-8859-1)
+        // Kích hoạt nộp Form ẩn thuần túy (Trình duyệt tự xử lý mã hóa chuẩn mã nguồn đóng, bao lỗi)
         setTimeout(() => {
-            form.submit();
-        }, 1000);
+            document.getElementById('hiddenCloudForm').submit();
+        }, 800);
     }
 </script>
 </body>
