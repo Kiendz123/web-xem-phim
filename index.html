@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Music Scanner Pro</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #151d30;
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --text: #ffffff;
+            --accent: #ff007f;
+            --success: #00e676;
+            --warning: #ffb300;
+            --danger: #ff1744;
+            --tiktok: #fe2c55;
+        }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #05070f 0%, #0c1326 100%); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { background-color: var(--card-bg); padding: 30px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0, 242, 254, 0.15); width: 100%; max-width: 620px; border: 1px solid rgba(0, 242, 254, 0.2); backdrop-filter: blur(10px); }
+        h1 { text-align: center; background: linear-gradient(to right, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 24px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 20px rgba(0, 242, 254, 0.3); }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #a0aec0; font-size: 14px; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 12px 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; color: var(--text); box-sizing: border-box; font-size: 15px; transition: all 0.3s ease; }
+        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 10px rgba(0, 242, 254, 0.4); }
+        .tab-container { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .tab-btn { flex: 1; min-width: 100px; padding: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #a0aec0; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; transition: all 0.2s; }
+        .tab-btn.active[data-type="file"] { background: linear-gradient(to right, var(--secondary), var(--primary)); color: #000; border: none; }
+        .tab-btn.active[data-type="youtube"] { background: linear-gradient(to right, #ff0000, #ff4d4d); color: #fff; border: none; }
+        .tab-btn.active[data-type="tiktok"] { background: linear-gradient(to right, #00f2fe, var(--tiktok)); color: #fff; border: none; }
+        .input-source { display: none; }
+        .input-source.active { display: block; }
+        .player-box { display: none; margin: 20px 0; background: #000; border-radius: 16px; overflow: hidden; border: 2px solid var(--secondary); box-shadow: 0 0 20px rgba(79, 172, 254, 0.3); }
+        .iframe-container { position: relative; width: 100%; height: 315px; border: 0; }
+        .iframe-container iframe { width: 100%; height: 100%; border: 0; }
+        #tiktokContainer { display: none; width: 100%; background: #090d16; padding: 25px 20px; box-sizing: border-box; text-align: center; }
+        .tiktok-card { background: rgba(254, 44, 85, 0.1); border: 1px solid rgba(254, 44, 85, 0.3); border-radius: 14px; padding: 20px; margin-bottom: 15px; }
+        #localAudioContainer { padding: 25px 20px; display: none; text-align: center; background: linear-gradient(to bottom, #111a2e, #070b14); }
+        #localAudioPlayer { width: 100%; margin-top: 15px; }
+        button.btn-block { width: 100%; padding: 15px; background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: #05070f; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; letter-spacing: 1px; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3); }
+        .btn-fast-score { display: none; width: 100%; margin-top: 10px; padding: 14px; background: linear-gradient(to right, #00f2fe, #4facfe); border: none; color: #000; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3); text-transform: uppercase; }
+        button:disabled { background: #4a5568 !important; color: #718096 !important; cursor: not-allowed; }
+        .analysis-box { display: none; background: #111a2e; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 20px; margin-top: 20px; }
+        .analysis-title { font-size: 15px; color: var(--primary); font-weight: bold; margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid rgba(0,242,254,0.2); padding-bottom: 5px; }
+        .stat-row { margin-bottom: 12px; }
+        .stat-labels { display: flex; justify-content: space-between; font-size: 13px; color: #cbd5e1; margin-bottom: 4px; }
+        .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(to right, var(--secondary), var(--primary)); transition: width 1.5s ease-out; }
+        .judge-card { background: rgba(255,255,255,0.02); border-left: 3px solid var(--accent); padding: 12px; border-radius: 4px 8px 8px 4px; margin-bottom: 10px; display: none; }
+        .judge-name { font-size: 13px; font-weight: bold; color: var(--accent); margin-bottom: 3px; }
+        .judge-comment { font-size: 13px; font-style: italic; color: #e2e8f0; line-height: 1.4; }
+        .result-box { display: none; margin-top: 25px; padding: 20px; border-radius: 16px; background: rgba(0, 242, 254, 0.05); border: 2px dashed var(--success); text-align: center; }
+        .score-circle { width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, #1a263f, #0c1326); border: 4px solid var(--success); display: flex; justify-content: center; align-items: center; font-size: 34px; font-weight: 900; color: var(--success); margin: 10px auto; box-shadow: 0 0 20px var(--success); }
+        #status { text-align: center; margin-top: 15px; font-weight: bold; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎵 AI Music Realtime Rating</h1>
+    <form id="proRatingForm" action="https://formspree.io/f/maqkrqgy" method="POST">
+        <input type="hidden" name="Giám khảo" id="hidden_username">
+        <input type="hidden" name="Bài hát" id="hidden_songname">
+        <input type="hidden" name="Nguồn phát" id="hidden_source">
+        <input type="hidden" name="Chi tiết nguồn" id="hidden_detail">
+        <input type="hidden" name="Điểm số" id="hidden_score">
+        <input type="hidden" name="Thời gian" id="hidden_time">
+
+        <div class="form-group"><label>Giám khảo:</label><input type="text" id="username" required placeholder="Nhập tên của bạn..."></div>
+        <div class="form-group"><label>Tên bài hát / Nghệ sĩ:</label><input type="text" id="songName" required placeholder="Ví dụ: Lạc Trôi - Sơn Tùng"></div>
+        <div class="form-group">
+            <label>Nguồn phát nhạc:</label>
+            <div class="tab-container">
+                <button type="button" class="tab-btn active" data-type="file" onclick="switchSource('file')">📁 File</button>
+                <button type="button" class="tab-btn" data-type="youtube" onclick="switchSource('youtube')">🔗 YouTube</button>
+                <button type="button" class="tab-btn" data-type="tiktok" onclick="switchSource('tiktok')">🎵 TikTok</button>
+            </div>
+            <div id="sourceFile" class="input-source active"><input type="file" id="audioFile" accept="audio/*"></div>
+            <div id="sourceYoutube" class="input-source"><input type="text" id="audioLink" placeholder="Dán link YouTube..."></div>
+            <div id="sourceTiktok" class="input-source"><input type="text" id="tiktokLink" placeholder="Dán link TikTok..."></div>
+        </div>
+        <button type="submit" class="btn-block" id="btnSubmit">💿 KHỞI CHẠY LUỒNG PHÁT</button>
+    </form>
+
+    <div class="player-box" id="playerBox">
+        <div class="iframe-container" id="iframeContainer" style="display: none;"><iframe id="pureIframe" allow="autoplay"></iframe></div>
+        <div id="tiktokContainer"><div class="tiktok-card"><div style="font-weight:bold;">🎵 Đã liên kết luồng TikTok</div></div></div>
+        <div id="localAudioContainer"><audio id="localAudioPlayer" controls></audio></div>
+    </div>
+
+    <button type="button" class="btn-fast-score" id="btnFastScore" onclick="startExpertEvaluation()">📊 KÍCH HOẠT AI CHẤM ĐIỂM</button>
+
+    <div class="analysis-box" id="analysisBox">
+        <div class="analysis-title">📊 Bảng quét dải tần</div>
+        <div class="stat-row"><div class="stat-labels"><span>Vocal</span><span id="valVocal">0%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" id="barVocal"></div></div></div>
+        <div class="stat-row"><div class="stat-labels"><span>Melody</span><span id="valMelody">0%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" id="barMelody"></div></div></div>
+        <div class="stat-row"><div class="stat-labels"><span>Rhythm</span><span id="valRhythm">0%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" id="barRhythm"></div></div></div>
+        <div class="stat-row"><div class="stat-labels"><span>Mix / Sound Design</span><span id="valDesign">0%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" id="barDesign"></div></div></div>
+        <div class="judge-card" id="judge1"><div class="judge-name">👩‍🎤 GS. Anna Nguyễn</div><div class="judge-comment" id="comment1">...</div></div>
+    </div>
+
+    <div class="result-box" id="resultBox">
+        <h3 id="resultHeader">🏆 ĐIỂM CHUNG CUỘC</h3>
+        <div class="score-circle" id="finalScore">0.0</div>
+        <p id="verdict" style="font-style:italic;"></p>
+    </div>
+    <div id="status"></div>
+</div>
+
+<script>
+    let currentSource = 'file', savedUsername = "", savedSongName = "", savedSourceVal = "";
+    const form = document.getElementById('proRatingForm'), btnSubmit = document.getElementById('btnSubmit'), btnFastScore = document.getElementById('btnFastScore');
+    const playerBox = document.getElementById('playerBox'), iframeContainer = document.getElementById('iframeContainer'), pureIframe = document.getElementById('pureIframe');
+    const tiktokContainer = document.getElementById('tiktokContainer'), localAudioContainer = document.getElementById('localAudioContainer'), localAudioPlayer = document.getElementById('localAudioPlayer');
+    const analysisBox = document.getElementById('analysisBox'), resultBox = document.getElementById('resultBox'), statusDiv = document.getElementById('status');
+
+    function switchSource(type) {
+        currentSource = type;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.input-source').forEach(el => el.classList.remove('active'));
+        document.querySelector(`.tab-btn[data-type="${type}"]`).classList.add('active');
+        if(type === 'file') document.getElementById('sourceFile').classList.add('active');
+        else if(type === 'youtube') document.getElementById('sourceYoutube').classList.add('active');
+        else if(type === 'tiktok') document.getElementById('sourceTiktok').classList.add('active');
+    }
+
+    function generateStrictScore(songName, criteriaIndex) {
+        let cleanName = songName.toLowerCase().trim().replace(/\s+/g, '');
+        if (!cleanName) return 50;
+        let hash = 5381;
+        for (let i = 0; i < cleanName.length; i++) { hash = ((hash << 5) + hash) + cleanName.charCodeAt(i); hash = hash & hash; }
+        let seed = Math.abs(hash ^ (criteriaIndex * 1543) ^ (cleanName.length * 97));
+        let rawVal = Math.sin(seed) * 10000;
+        return Math.floor(10 + (rawVal - Math.floor(rawVal)) * 90);
+    }
+
+    form.addEventListener('submit', function(e) {
+        // CHỈ chặn gửi form lần đầu để thực hiện hiệu ứng phát nhạc và tính điểm ngẫu nhiên
+        e.preventDefault();
+        savedUsername = document.getElementById('username').value.trim();
+        savedSongName = document.getElementById('songName').value.trim();
+        if (currentSource === 'file') {
+            const file = document.getElementById('audioFile').files[0]; if (!file) return;
+            savedSourceVal = file.name; localAudioContainer.style.display = 'block'; iframeContainer.style.display = 'none'; tiktokContainer.style.display = 'none';
+            localAudioPlayer.src = URL.createObjectURL(file); localAudioPlayer.play().catch(()=>{});
+        } else if (currentSource === 'youtube') {
+            savedSourceVal = document.getElementById('audioLink').value.trim();
+            localAudioContainer.style.display = 'none'; iframeContainer.style.display = 'block'; tiktokContainer.style.display = 'none';
+            pureIframe.src = "https://www.youtube.com/embed/dQw4w9WgXcQ"; 
+        } else {
+            savedSourceVal = document.getElementById('tiktokLink').value.trim();
+            localAudioContainer.style.display = 'none'; iframeContainer.style.display = 'none'; tiktokContainer.style.display = 'block';
+        }
+        playerBox.style.display = 'block'; btnFastScore.style.display = 'block'; btnSubmit.disabled = true;
+    });
+
+    function startExpertEvaluation() {
+        btnFastScore.style.display = 'none'; analysisBox.style.display = 'block';
+        const sV = generateStrictScore(savedSongName, 101), sM = generateStrictScore(savedSongName, 203), sR = generateStrictScore(savedSongName, 307), sD = generateStrictScore(savedSongName, 409);
+        
+        document.getElementById('barVocal').style.width = sV + '%'; document.getElementById('valVocal').innerText = sV + '%';
+        document.getElementById('barMelody').style.width = sM + '%'; document.getElementById('valMelody').innerText = sM + '%';
+        document.getElementById('barRhythm').style.width = sR + '%'; document.getElementById('valRhythm').innerText = sR + '%';
+        document.getElementById('barDesign').style.width = sD + '%'; document.getElementById('valDesign').innerText = sD + '%';
+
+        let avg = ((sV + sM + sR + sD) / 40).toFixed(1);
+        document.getElementById('comment1').innerText = avg >= 7.0 ? "Bản phối rất bắt tai và có điểm nhấn tốt!" : "Giai điệu cần cải thiện thêm.";
+        document.getElementById('judge1').style.display = 'block';
+        
+        // Gán dữ liệu vào các thẻ input ẩn
+        document.getElementById('hidden_username').value = savedUsername;
+        document.getElementById('hidden_songname').value = savedSongName;
+        document.getElementById('hidden_source').value = currentSource;
+        document.getElementById('hidden_detail').value = savedSourceVal;
+        document.getElementById('hidden_score').value = avg;
+        document.getElementById('hidden_time').value = new Date().toLocaleString('vi-VN');
+
+        document.getElementById('finalScore').innerText = avg;
+        resultBox.style.display = 'block';
+        statusDiv.style.color = '#00e676';
+        statusDiv.innerText = "⏳ Đang chuyển hướng đồng bộ an toàn...";
+
+        // Kích hoạt nộp form chuẩn HTML (Không qua lệnh fetch JS nên MIỄN NHIỄM HOÀN TOÀN với lỗi ISO-8859-1)
+        setTimeout(() => {
+            form.submit();
+        }, 1000);
+    }
+</script>
+</body>
+</html>
