@@ -102,7 +102,6 @@
 </div>
 
 <script>
-    // Link Formspree chính chủ của bạn đã được gắn cố định tại đây:
     const FORMSPREE_API_URL = "https://formspree.io/f/maqkrqgy";
 
     let currentSource = 'file', savedUsername = "", savedSongName = "", savedSourceVal = "";
@@ -169,26 +168,33 @@
     async function sendDataToCloud(finalScore) {
         document.getElementById('finalScore').innerText = finalScore;
         resultBox.style.display = 'block';
+        statusDiv.style.color = 'orange';
         statusDiv.innerText = "⏳ Đang đồng bộ điểm số lên hệ thống...";
 
         const data = {
-            "Người chấm": savedUsername,
-            "Bài hát": savedSongName,
-            "Nguồn": currentSource,
-            "Link/File": savedSourceVal,
-            "Điểm": finalScore,
-            "Thời gian": new Date().toLocaleString('vi-VN')
+            "Giam_Khao": savedUsername,
+            "Bai_Hat": savedSongName,
+            "Nguon_Phat": currentSource,
+            "Chi_Tiet_Nguon": savedSourceVal,
+            "Diem_So": finalScore,
+            "Thoi_Gian": new Date().toLocaleString('vi-VN')
         };
 
         try {
+            // Sử dụng cấu hình chuẩn hóa Header chống lỗi kí tự tiếng Việt nâng cao
             await fetch(FORMSPREE_API_URL, {
                 method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                headers: { 
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json; charset=UTF-8' 
+                },
                 body: JSON.stringify(data)
             });
-            statusDiv.innerHTML = "<span style='color:var(--success)'>🚀 Đã lưu điểm thành công!</span>";
+            statusDiv.style.color = '#00e676';
+            statusDiv.innerHTML = "🚀 Đã lưu điểm thành công!";
         } catch (err) {
-            statusDiv.innerHTML = "<span style='color:var(--danger)'>❌ Lỗi lưu trữ mạng.</span>";
+            statusDiv.style.color = '#ff1744';
+            statusDiv.innerHTML = "❌ Lỗi kết nối lưu trữ mạng.";
         } finally { btnSubmit.disabled = false; }
     }
 </script>
